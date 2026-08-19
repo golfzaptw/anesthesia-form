@@ -4,6 +4,8 @@ import { useState } from "react";
 import type { FormConfig } from "@/lib/formData";
 import { saveFormConfig } from "@/lib/firestore";
 import toast from "react-hot-toast";
+import Link from "next/link";
+import { Eye } from "lucide-react";
 
 export function FormEditor({
   initialConfig,
@@ -105,8 +107,13 @@ export function FormEditor({
       </div>
 
       <div className="grid md:grid-cols-2 gap-4">
-        <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
-          <h3 className="font-medium text-sm text-gray-800">ชุด 1: คำถามการเรียนการสอน (1 บรรทัดต่อ 1 ข้อ)</h3>
+        <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-3 md:col-span-2">
+          <div className="flex items-center justify-between">
+            <h3 className="font-medium text-sm text-gray-800">ชุด 1: คำถามการเรียนการสอน (1 บรรทัดต่อ 1 ข้อ)</h3>
+            <Link href="/admin/preview/1" target="_blank" className="flex items-center gap-1 text-xs text-blue-600 hover:underline">
+              <Eye className="w-3 h-3" /> ดูตัวอย่าง
+            </Link>
+          </div>
           <textarea
             className="w-full h-48 p-3 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
             defaultValue={config.form1Questions.join("\n")}
@@ -114,26 +121,43 @@ export function FormEditor({
           />
         </div>
 
-        <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
-          <h3 className="font-medium text-sm text-gray-800">ชุด 2: รายชื่ออาจารย์ (1 บรรทัดต่อ 1 ชื่อ)</h3>
-          <textarea
-            className="w-full h-48 p-3 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-            defaultValue={config.form2Instructors.join("\n")}
-            onChange={(e) => handleArrayChange("form2Instructors", e.target.value)}
-          />
+        <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-6 md:col-span-2">
+          {/* Form 2 Header with Preview Link */}
+          <div className="flex items-center justify-between border-b pb-2">
+            <h3 className="font-medium text-sm text-gray-800">ชุด 2: ประเมินอาจารย์แพทย์</h3>
+            <Link href="/admin/preview/2" target="_blank" className="flex items-center gap-1 text-xs text-blue-600 hover:underline">
+              <Eye className="w-3 h-3" /> ดูตัวอย่าง
+            </Link>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-6">
+            <div className="space-y-3">
+              <h4 className="font-medium text-xs text-gray-700">รายชื่ออาจารย์ (1 บรรทัดต่อ 1 ชื่อ)</h4>
+              <textarea
+                className="w-full h-48 p-3 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                defaultValue={config.form2Instructors.join("\n")}
+                onChange={(e) => handleArrayChange("form2Instructors", e.target.value)}
+              />
+            </div>
+            
+            <div className="space-y-3">
+              <h4 className="font-medium text-xs text-gray-700">หัวข้อการประเมิน (1 บรรทัดต่อ 1 ข้อ)</h4>
+              <textarea
+                className="w-full h-48 p-3 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                defaultValue={config.form2Questions.join("\n")}
+                onChange={(e) => handleArrayChange("form2Questions", e.target.value)}
+              />
+            </div>
+          </div>
         </div>
 
-        <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
-          <h3 className="font-medium text-sm text-gray-800">ชุด 2: คำถามอาจารย์แพทย์ (1 บรรทัดต่อ 1 ข้อ)</h3>
-          <textarea
-            className="w-full h-48 p-3 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-            defaultValue={config.form2Questions.join("\n")}
-            onChange={(e) => handleArrayChange("form2Questions", e.target.value)}
-          />
-        </div>
-
-        <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
-          <h3 className="font-medium text-sm text-gray-800">ชุด 3: รายชื่อแผนกและพยาบาลวิสัญญี (JSON)</h3>
+        <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-3 md:col-span-2">
+          <div className="flex items-center justify-between">
+            <h3 className="font-medium text-sm text-gray-800">ชุด 3: รายชื่อแผนกและพยาบาลวิสัญญี (JSON)</h3>
+            <Link href="/admin/preview/3" target="_blank" className="flex items-center gap-1 text-xs text-blue-600 hover:underline">
+              <Eye className="w-3 h-3" /> ดูตัวอย่าง
+            </Link>
+          </div>
           <textarea
             className="w-full h-48 p-3 text-xs border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-mono"
             defaultValue={JSON.stringify(config.form3Departments, null, 2)}
