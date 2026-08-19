@@ -36,15 +36,15 @@ export function LoginForm() {
 
   useEffect(() => {
     if (!loading && user && !isRegistering.current && !generatedPassword) {
-      document.cookie = "auth_session=1; path=/; SameSite=Strict";
-      router.replace(redirect);
+      document.cookie = "auth_session=1; path=/; max-age=2592000; SameSite=Lax";
+      window.location.href = redirect;
     }
-  }, [user, loading, router, redirect, generatedPassword]);
+  }, [user, loading, redirect, generatedPassword]);
 
   const proceedToApp = () => {
     const finalRedirect = isAdminTab ? "/admin" : redirect;
-    document.cookie = "auth_session=1; path=/; SameSite=Strict";
-    router.replace(finalRedirect);
+    document.cookie = "auth_session=1; path=/; max-age=2592000; SameSite=Lax";
+    window.location.href = finalRedirect;
   };
 
   const onSubmit = async ({ email, password, displayName }: FormValues) => {
