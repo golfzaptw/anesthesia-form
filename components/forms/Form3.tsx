@@ -72,10 +72,12 @@ function DeptSection({
 // ─────────────────────────────────────────────
 export function Form3({ 
   userId,
-  departments
+  departments,
+  preview
 }: { 
   userId: string;
   departments: DepartmentData[];
+  preview?: boolean;
 }) {
   const router = useRouter();
   const { user } = useAuth();
@@ -84,6 +86,10 @@ export function Form3({
   const { register, handleSubmit } = useForm<Form3Values>();
 
   const onSubmit = async (data: Form3Values) => {
+    if (preview) {
+      toast.success("นี่คือโหมด Preview (ไม่มีการบันทึกข้อมูลจริง)");
+      return;
+    }
     if (!user) return;
     setSubmitting(true);
     try {

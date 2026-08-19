@@ -13,7 +13,7 @@ import { EvaluatorBadge } from "@/components/ui/EvaluatorBadge";
 
 type Form1Values = Record<string, string>;
 
-export function Form1({ userId, questions }: { userId: string; questions: string[] }) {
+export function Form1({ userId, questions, preview }: { userId: string; questions: string[]; preview?: boolean }) {
   const router = useRouter();
   const { user } = useAuth();
   const [submitting, setSubmitting] = useState(false);
@@ -25,6 +25,10 @@ export function Form1({ userId, questions }: { userId: string; questions: string
   } = useForm<Form1Values>();
 
   const onSubmit = async (data: Form1Values) => {
+    if (preview) {
+      toast.success("นี่คือโหมด Preview (ไม่มีการบันทึกข้อมูลจริง)");
+      return;
+    }
     if (!user) return;
     setSubmitting(true);
     try {

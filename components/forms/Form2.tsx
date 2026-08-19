@@ -123,10 +123,12 @@ export function Form2({
   userId,
   instructors,
   questions,
+  preview,
 }: {
   userId: string;
   instructors: string[];
   questions: string[];
+  preview?: boolean;
 }) {
   const router = useRouter();
   const { user } = useAuth();
@@ -139,6 +141,10 @@ export function Form2({
   } = useForm<Form2Values>();
 
   const onSubmit = async (data: Form2Values) => {
+    if (preview) {
+      toast.success("นี่คือโหมด Preview (ไม่มีการบันทึกข้อมูลจริง)");
+      return;
+    }
     if (!user) return;
     setSubmitting(true);
     try {
