@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import toast from "react-hot-toast";
 import { useAuth } from "@/contexts/AuthContext";
@@ -15,7 +15,6 @@ interface FormValues {
 
 export function LoginForm() {
   const { user, loading, signIn, registerAsGuest, loginAsGuest } = useAuth();
-  const router = useRouter();
   const searchParams = useSearchParams();
   const redirect = searchParams.get("redirect") ?? "/hub";
 
