@@ -133,8 +133,8 @@ export function LoginForm() {
             <div className="bg-blue-600 text-white rounded-full p-3 mb-4">
               <Stethoscope className="w-8 h-8" />
             </div>
-            <h1 className="text-2xl font-bold text-gray-800">แบบประเมินความพึงพอใจ</h1>
-            <p className="text-gray-500 text-sm mt-1">พยาบาลวิสัญญี รุ่นที่ 42</p>
+            <h1 className="text-2xl font-bold text-gray-800 text-center">แบบประเมินวิสัญญีแพทย์และวิสัญญีพยาบาล</h1>
+            <p className="text-gray-500 text-sm mt-1 text-center">พยาบาลวิสัญญี รุ่นที่ 42</p>
           </div>
 
           <div className="flex rounded-lg border border-gray-200 mb-6 overflow-hidden">
@@ -161,12 +161,14 @@ export function LoginForm() {
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             {!isAdminTab ? (
               <>
-                <div className="flex gap-2 mb-4 bg-gray-50 p-1 rounded-lg">
+                <div className="flex gap-2 mb-4 bg-gray-100 p-1.5 rounded-lg shadow-inner">
                   <button
                     type="button"
                     onClick={() => setIsEvaluatorNew(true)}
-                    className={`flex-1 text-xs py-1.5 rounded-md transition-colors ${
-                      isEvaluatorNew ? "bg-white shadow-sm font-medium text-gray-800" : "text-gray-500"
+                    className={`flex-1 text-xs py-2 rounded-md transition-all duration-300 ${
+                      isEvaluatorNew 
+                        ? "bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-md font-semibold" 
+                        : "text-gray-500 hover:text-gray-700 hover:bg-gray-200"
                     }`}
                   >
                     สร้างชื่อใหม่
@@ -174,13 +176,22 @@ export function LoginForm() {
                   <button
                     type="button"
                     onClick={() => setIsEvaluatorNew(false)}
-                    className={`flex-1 text-xs py-1.5 rounded-md transition-colors ${
-                      !isEvaluatorNew ? "bg-white shadow-sm font-medium text-gray-800" : "text-gray-500"
+                    className={`flex-1 text-xs py-2 rounded-md transition-all duration-300 ${
+                      !isEvaluatorNew 
+                        ? "bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-md font-semibold" 
+                        : "text-gray-500 hover:text-gray-700 hover:bg-gray-200"
                     }`}
                   >
                     กลับมาทำต่อ
                   </button>
                 </div>
+
+                {isEvaluatorNew && (
+                  <div className="mb-4 p-3 bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-100 rounded-lg text-xs text-purple-800 shadow-sm flex items-start gap-2">
+                    <span className="text-purple-500">💡</span>
+                    <span><strong>หมายเหตุ:</strong> สามารถกลับมาทำภายหลังได้ตรงหน้าแรกโดยใช้รหัสที่แนบไป</span>
+                  </div>
+                )}
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
