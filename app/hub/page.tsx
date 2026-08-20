@@ -22,10 +22,14 @@ export default function HubPage() {
   const [fetchingStatus, setFetchingStatus] = useState(true);
 
   useEffect(() => {
-    if (!loading && !user) {
-      router.replace("/login");
+    if (!loading) {
+      if (!user) {
+        window.location.href = "/login";
+      } else if (isAdmin(user.email)) {
+        window.location.href = "/admin";
+      }
     }
-  }, [user, loading, router]);
+  }, [user, loading]);
 
   useEffect(() => {
     if (!user) return;

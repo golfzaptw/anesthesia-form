@@ -6,6 +6,7 @@ import { useForm } from "react-hook-form";
 import toast from "react-hot-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { Stethoscope, Eye, EyeOff } from "lucide-react";
+import { isAdmin } from "@/lib/admin";
 
 interface FormValues {
   displayName: string;
@@ -35,8 +36,9 @@ export function LoginForm() {
 
   useEffect(() => {
     if (!loading && user && !isRegistering.current && !generatedPassword) {
+      const finalRedirect = isAdmin(user.email) ? "/admin" : redirect;
       document.cookie = "auth_session=1; path=/; max-age=2592000; SameSite=Lax";
-      window.location.href = redirect;
+      window.location.href = finalRedirect;
     }
   }, [user, loading, redirect, generatedPassword]);
 
