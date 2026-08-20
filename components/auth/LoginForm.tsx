@@ -19,7 +19,7 @@ export function LoginForm() {
   const searchParams = useSearchParams();
   const redirect = searchParams.get("redirect") ?? "/hub";
 
-  const [isAdminTab, setIsAdminTab] = useState(false);
+  const [isAdminTab] = useState(searchParams.get("admin") === "true");
   const [isEvaluatorNew, setIsEvaluatorNew] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -135,27 +135,6 @@ export function LoginForm() {
             </div>
             <h1 className="text-2xl font-bold text-gray-800 text-center">แบบประเมินวิสัญญีแพทย์และวิสัญญีพยาบาล</h1>
             <p className="text-gray-500 text-sm mt-1 text-center">พยาบาลวิสัญญี รุ่นที่ 42</p>
-          </div>
-
-          <div className="flex rounded-lg border border-gray-200 mb-6 overflow-hidden">
-            <button
-              type="button"
-              onClick={() => setIsAdminTab(false)}
-              className={`flex-1 py-2 text-sm font-medium transition-colors ${
-                !isAdminTab ? "bg-blue-600 text-white" : "text-gray-600 hover:bg-gray-50"
-              }`}
-            >
-              ผู้ประเมิน
-            </button>
-            <button
-              type="button"
-              onClick={() => setIsAdminTab(true)}
-              className={`flex-1 py-2 text-sm font-medium transition-colors ${
-                isAdminTab ? "bg-blue-600 text-white" : "text-gray-600 hover:bg-gray-50"
-              }`}
-            >
-              ผู้ดูแลระบบ
-            </button>
           </div>
 
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
