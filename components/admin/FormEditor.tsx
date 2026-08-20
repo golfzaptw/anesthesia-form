@@ -7,6 +7,9 @@ import toast from "react-hot-toast";
 import Link from "next/link";
 import { Eye, Plus, Trash2, ChevronUp, ChevronDown } from "lucide-react";
 
+type DeptWithId = { dept: string; staff: string[]; _id: string };
+type ConfigWithIds = Omit<FormConfig, "form3Departments"> & { form3Departments: DeptWithId[] };
+
 export function FormEditor({
   initialConfig,
   onSave,
@@ -14,24 +17,24 @@ export function FormEditor({
   initialConfig: FormConfig;
   onSave: (newConfig: FormConfig) => void;
 }) {
-  const [config, setConfig] = useState<FormConfig>(() => {
+  const [config, setConfig] = useState<ConfigWithIds>(() => {
     const c = JSON.parse(JSON.stringify(initialConfig));
     // Add _id for React keys
-    c.form3Departments.forEach((d: any) => {
+    c.form3Departments.forEach((d: DeptWithId) => {
       d._id = Math.random().toString(36).slice(2);
     });
-    return c;
+    return c as ConfigWithIds;
   });
   const [saving, setSaving] = useState(false);
 
   const handleSave = async () => {
     setSaving(true);
     try {
-      const configToSave = { ...config };
-      configToSave.form3Departments = configToSave.form3Departments.map((d: any) => {
-        const { _id, ...rest } = d;
-        return rest;
-      });
+      const configToSave = { ...config } as unknown as FormConfig;
+      configToSave.form3Departments = config.form3Departments.map((d) => ({
+        dept: d.dept,
+        staff: d.staff,
+      }));
       await saveFormConfig(configToSave);
       onSave(configToSave);
       toast.success("บันทึกการตั้งค่าสำเร็จ");
@@ -51,7 +54,7 @@ export function FormEditor({
   };
 
   const handleUpdateDeptName = (id: string, name: string) => {
-    const newDepts = config.form3Departments.map((d: any) => 
+    const newDepts = config.form3Departments.map((d) => 
       d._id === id ? { ...d, dept: name } : d
     );
     setConfig({ ...config, form3Departments: newDepts });
@@ -59,7 +62,7 @@ export function FormEditor({
 
   const handleUpdateDeptStaff = (id: string, staffText: string) => {
     const staffArr = staffText.split("\n").map((s) => s.trim()).filter((s) => s.length > 0);
-    const newDepts = config.form3Departments.map((d: any) => 
+    const newDepts = config.form3Departments.map((d) => 
       d._id === id ? { ...d, staff: staffArr } : d
     );
     setConfig({ ...config, form3Departments: newDepts });
@@ -70,7 +73,7 @@ export function FormEditor({
       ...config,
       form3Departments: [
         ...config.form3Departments,
-        { _id: Math.random().toString(36).slice(2), dept: "", staff: [] } as any
+        { _id: Math.random().toString(36).slice(2), dept: "", staff: [] },
       ]
     });
   };
@@ -79,7 +82,7 @@ export function FormEditor({
     if (!confirm("ต้องการลบแผนกนี้ใช่หรือไม่?")) return;
     setConfig({
       ...config,
-      form3Departments: config.form3Departments.filter((d: any) => d._id !== id)
+      form3Departments: config.form3Departments.filter((d) => d._id !== id)
     });
   };
 
@@ -209,7 +212,7 @@ export function FormEditor({
           </div>
           
           <div className="grid md:grid-cols-2 gap-4">
-            {config.form3Departments.map((dept: any, index: number) => (
+            {config.form3Departments.map((dept, index: number) => (
               <div key={dept._id} className="border border-gray-200 rounded-lg p-4 bg-gray-50/50 space-y-3 relative group">
                 {/* Action buttons */}
                 <div className="absolute top-3 right-3 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
