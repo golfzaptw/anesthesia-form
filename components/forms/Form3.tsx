@@ -77,10 +77,10 @@ function DeptSection({
   return (
     <div
       className={`rounded-3xl border transition-all duration-200 overflow-hidden shadow-sm ${hasErrors
-          ? "border-rose-300 ring-1 ring-rose-300 bg-rose-50/10"
-          : isAllFilled
-            ? "border-teal-200 bg-teal-50/20"
-            : "border-slate-200 bg-white hover:border-slate-300"
+        ? "border-rose-300 ring-1 ring-rose-300 bg-rose-50/10"
+        : isAllFilled
+          ? "border-teal-200 bg-teal-50/20"
+          : "border-slate-200 bg-white hover:border-slate-300"
         }`}
     >
       {/* Department Header */}
@@ -92,10 +92,10 @@ function DeptSection({
         <div className="flex items-center gap-3 min-w-0">
           <div
             className={`w-10 h-10 rounded-2xl flex items-center justify-center font-bold text-sm shrink-0 shadow-sm ${hasErrors
-                ? "bg-rose-500 text-white"
-                : isAllFilled
-                  ? "bg-emerald-600 text-white"
-                  : "bg-gradient-to-br from-teal-600 to-emerald-600 text-white"
+              ? "bg-rose-500 text-white"
+              : isAllFilled
+                ? "bg-emerald-600 text-white"
+                : "bg-gradient-to-br from-teal-600 to-emerald-600 text-white"
               }`}
           >
             <Building2 className="w-5 h-5" />
@@ -146,10 +146,10 @@ function DeptSection({
               <div
                 key={index}
                 className={`rounded-2xl border p-4 sm:p-5 transition-all duration-150 ${fieldError
-                    ? "border-rose-300 bg-rose-50/30 ring-1 ring-rose-300"
-                    : isFilled
-                      ? "border-teal-200 bg-white shadow-sm ring-1 ring-teal-200/50"
-                      : "border-slate-200/80 bg-white hover:border-slate-300 shadow-sm"
+                  ? "border-rose-300 bg-rose-50/30 ring-1 ring-rose-300"
+                  : isFilled
+                    ? "border-teal-200 bg-white shadow-sm ring-1 ring-teal-200/50"
+                    : "border-slate-200/80 bg-white hover:border-slate-300 shadow-sm"
                   }`}
               >
                 <div className="flex items-start justify-between gap-3 mb-2.5">
@@ -310,7 +310,7 @@ export function Form3({
           </div>
 
           <h1 className="text-xl sm:text-2xl font-bold leading-tight">
-            แบบประเมินความพึงพอใจของนักเรียนพยาบาลวิสัญญี รุ่นที่ 41
+            แบบประเมินความพึงพอใจของนักเรียนพยาบาลวิสัญญี รุ่นที่ 42
           </h1>
           <p className="mt-1.5 text-teal-200 text-sm sm:text-base font-medium">
             ต่อบุคลากรระดับพยาบาลวิสัญญี (แยกตาม {departments.length} แผนก • รวม {totalStaffCount} ท่าน)
