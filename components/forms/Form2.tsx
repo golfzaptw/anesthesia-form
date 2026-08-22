@@ -107,17 +107,17 @@ function InstructorSection({
       <button
         type="button"
         onClick={onToggleOpen}
-        className="w-full flex items-center justify-between p-4 sm:p-5 text-left bg-gradient-to-r from-indigo-50/80 via-white to-slate-50/50 hover:bg-indigo-50/90 transition-colors gap-3"
+        className="w-full flex items-center justify-between p-4 sm:p-5 text-left bg-gradient-to-r from-purple-50/90 via-fuchsia-50/30 to-slate-50 hover:bg-purple-50 transition-colors gap-3"
       >
         <div className="flex items-center gap-3 min-w-0">
-          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-indigo-600 text-white flex items-center justify-center font-bold text-xs sm:text-sm shrink-0 shadow-sm">
+          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-purple-600 text-white flex items-center justify-center font-bold text-xs sm:text-sm shrink-0 shadow-sm">
             {index + 1}
           </div>
           <div className="min-w-0">
             <span className="font-bold text-slate-800 text-sm sm:text-base leading-snug block truncate">
               {name}
             </span>
-            <span className="text-xs text-indigo-600 font-medium">อาจารย์วิสัญญีแพทย์</span>
+            <span className="text-xs text-purple-700 font-medium">อาจารย์วิสัญญีแพทย์</span>
           </div>
         </div>
 
@@ -147,7 +147,7 @@ function InstructorSection({
               <label
                 className={`flex items-center justify-center gap-2 p-3 sm:py-3.5 rounded-xl border-2 cursor-pointer transition-all font-semibold text-sm text-center ${
                   metValue === "เคย"
-                    ? "border-indigo-600 bg-indigo-600 text-white shadow-md shadow-indigo-600/20"
+                    ? "border-purple-600 bg-purple-600 text-white shadow-md shadow-purple-600/20"
                     : "border-slate-200 bg-white text-slate-700 hover:bg-slate-100 hover:border-slate-300"
                 }`}
               >
@@ -198,7 +198,7 @@ function InstructorSection({
               <button
                 type="button"
                 onClick={onToggleOpen}
-                className="text-indigo-600 font-semibold hover:underline text-xs"
+                className="text-purple-600 font-semibold hover:underline text-xs"
               >
                 ย่อกล่องนี้
               </button>
@@ -208,8 +208,8 @@ function InstructorSection({
           {/* Evaluation questions — shown only when "met" */}
           {metValue === "เคย" && (
             <div className="space-y-4 pt-2">
-              <div className="flex items-center gap-1.5 text-xs text-indigo-700 font-bold uppercase tracking-wide">
-                <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
+              <div className="flex items-center gap-1.5 text-xs text-purple-700 font-bold uppercase tracking-wide">
+                <Sparkles className="w-3.5 h-3.5 text-purple-600" />
                 <span>เกณฑ์การประเมินอาจารย์ ({questions.length} ข้อ)</span>
               </div>
 
@@ -371,9 +371,9 @@ export function Form2({
   return (
     <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-6">
       {/* Hero Header */}
-      <div className="relative overflow-hidden bg-gradient-to-br from-indigo-800 via-indigo-900 to-slate-900 text-white rounded-3xl p-6 sm:p-8 shadow-lg shadow-indigo-950/20">
+      <div className="relative overflow-hidden bg-gradient-to-br from-purple-800 via-purple-900 to-slate-950 text-white rounded-3xl p-6 sm:p-8 shadow-lg shadow-purple-950/20">
         <div className="relative z-10">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/15 backdrop-blur-md text-indigo-100 text-xs font-semibold mb-3 border border-white/10">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/15 backdrop-blur-md text-purple-100 text-xs font-semibold mb-3 border border-white/10">
             <GraduationCap className="w-3.5 h-3.5" />
             <span>แบบประเมินที่ 2 • อาจารย์วิสัญญีแพทย์</span>
           </div>
@@ -381,13 +381,13 @@ export function Form2({
           <h1 className="text-xl sm:text-2xl font-bold leading-tight">
             แบบประเมินความพึงพอใจของนักเรียนพยาบาลวิสัญญี รุ่นที่ 42
           </h1>
-          <p className="mt-1.5 text-indigo-200 text-sm sm:text-base font-medium">
+          <p className="mt-1.5 text-purple-200 text-sm sm:text-base font-medium">
             ต่อบุคลากรระดับอาจารย์วิสัญญีแพทย์ (จำนวน {instructors.length} ท่าน)
           </p>
 
-          <div className="mt-5 pt-4 border-t border-white/15 flex flex-wrap items-center gap-4 text-xs text-indigo-200">
+          <div className="mt-5 pt-4 border-t border-white/15 flex flex-wrap items-center gap-4 text-xs text-purple-200">
             <span className="flex items-center gap-1.5">
-              <HelpCircle className="w-3.5 h-3.5 text-indigo-300" />
+              <HelpCircle className="w-3.5 h-3.5 text-purple-300" />
               เกณฑ์คะแนน: 1=ควรปรับปรุง, 2=พอใช้, 3=ปานกลาง, 4=ดี, 5=ดีมาก
             </span>
           </div>
@@ -400,16 +400,16 @@ export function Form2({
       <div className="sticky top-2 z-20 bg-white/95 backdrop-blur-md border border-slate-200/90 rounded-2xl p-4 shadow-sm transition-all">
         <div className="flex items-center justify-between gap-3 text-xs sm:text-sm font-semibold mb-2">
           <span className="text-slate-700 flex items-center gap-1.5">
-            <CheckCircle2 className="w-4 h-4 text-indigo-600" />
+            <CheckCircle2 className="w-4 h-4 text-purple-600" />
             ความคืบหน้าการประเมินอาจารย์
           </span>
-          <span className="text-indigo-600 font-bold">
+          <span className="text-purple-700 font-bold">
             {completedInstructors} / {totalInstructors} ท่าน ({percent}%)
           </span>
         </div>
         <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
           <div
-            className="h-full bg-gradient-to-r from-indigo-600 to-blue-600 rounded-full transition-all duration-300"
+            className="h-full bg-gradient-to-r from-purple-600 to-fuchsia-600 rounded-full transition-all duration-300"
             style={{ width: `${percent}%` }}
           />
         </div>
@@ -426,7 +426,7 @@ export function Form2({
               placeholder="ค้นหาชื่ออาจารย์..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 text-sm rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+              className="w-full pl-9 pr-4 py-2 text-sm rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
             />
           </div>
 
@@ -435,7 +435,7 @@ export function Form2({
             <button
               type="button"
               onClick={() => toggleAll(true)}
-              className="flex-1 sm:flex-initial px-3 py-2 text-xs font-semibold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded-xl border border-indigo-200 transition-colors"
+              className="flex-1 sm:flex-initial px-3 py-2 text-xs font-semibold text-purple-700 bg-purple-50 hover:bg-purple-100 rounded-xl border border-purple-200 transition-colors"
             >
               เปิดทั้งหมด
             </button>
@@ -467,7 +467,7 @@ export function Form2({
             onClick={() => setFilterMode("pending")}
             className={`px-3 py-1.5 rounded-lg font-medium whitespace-nowrap transition-colors ${
               filterMode === "pending"
-                ? "bg-indigo-600 text-white font-semibold"
+                ? "bg-purple-600 text-white font-semibold"
                 : "bg-slate-100 text-slate-600 hover:bg-slate-200"
             }`}
           >

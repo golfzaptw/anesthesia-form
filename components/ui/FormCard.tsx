@@ -25,11 +25,11 @@ export function FormCard({ id, title, description, href, completed, disabled, di
     },
     form_2: {
       icon: GraduationCap,
-      iconBg: "bg-indigo-100 text-indigo-700 group-hover:bg-indigo-600 group-hover:text-white",
+      iconBg: "bg-purple-100 text-purple-700 group-hover:bg-purple-600 group-hover:text-white",
       badge: "อาจารย์วิสัญญีแพทย์",
-      badgeColor: "bg-indigo-50 text-indigo-700 border-indigo-200",
-      accentBorder: "group-hover:border-indigo-300",
-      btnBg: "bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-500/20",
+      badgeColor: "bg-purple-50 text-purple-700 border-purple-200",
+      accentBorder: "group-hover:border-purple-300",
+      btnBg: "bg-purple-600 hover:bg-purple-700 text-white shadow-purple-500/20",
     },
     form_3: {
       icon: Users2,

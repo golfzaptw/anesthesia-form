@@ -39,7 +39,7 @@ export default function Form2Page() {
   if (loading || !user || !config) {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center gap-3">
-        <div className="w-12 h-12 rounded-2xl bg-indigo-600/10 border border-indigo-200 flex items-center justify-center text-indigo-600">
+        <div className="w-12 h-12 rounded-2xl bg-purple-600/10 border border-purple-200 flex items-center justify-center text-purple-600">
           <Loader2 className="w-6 h-6 animate-spin" />
         </div>
         <p className="text-sm font-medium text-slate-500">กำลังโหลดแบบประเมินอาจารย์...</p>
@@ -48,20 +48,20 @@ export default function Form2Page() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-indigo-50/40 via-slate-50 to-blue-50/30 pb-16">
+    <div className="min-h-screen bg-gradient-to-b from-purple-50/50 via-slate-50 to-violet-50/30 pb-16">
       {/* Top Navigation Bar */}
       <header className="sticky top-0 z-30 bg-white/80 backdrop-blur-md border-b border-slate-200/80 px-4 py-3">
         <div className="max-w-2xl mx-auto flex items-center justify-between">
           <Link
             href="/hub"
-            className="inline-flex items-center gap-2 text-xs sm:text-sm font-semibold text-slate-600 hover:text-indigo-600 bg-slate-100 hover:bg-indigo-50 px-3 py-1.5 rounded-xl transition-all border border-slate-200 hover:border-indigo-200"
+            className="inline-flex items-center gap-2 text-xs sm:text-sm font-semibold text-slate-600 hover:text-purple-600 bg-slate-100 hover:bg-purple-50 px-3 py-1.5 rounded-xl transition-all border border-slate-200 hover:border-purple-200"
           >
             <ArrowLeft className="w-4 h-4" />
             <span>กลับหน้าหลัก</span>
           </Link>
 
           <div className="flex items-center gap-2 text-xs font-semibold text-slate-500">
-            <span className="w-2 h-2 rounded-full bg-indigo-500 inline-block animate-pulse" />
+            <span className="w-2 h-2 rounded-full bg-purple-500 inline-block animate-pulse" />
             <span>โหมดประเมินอาจารย์</span>
           </div>
         </div>
