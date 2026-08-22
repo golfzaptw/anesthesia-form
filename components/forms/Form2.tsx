@@ -264,10 +264,13 @@ export function Form2({
   const [searchTerm, setSearchTerm] = useState("");
   const [filterMode, setFilterMode] = useState<"all" | "met" | "unmet" | "pending">("all");
 
-  // Track which accordion sections are open
+  // Track which accordion sections are open (all open by default)
   const [openSections, setOpenSections] = useState<Record<number, boolean>>(() => {
-    // Open first 2 by default
-    return { 0: true, 1: true };
+    const initial: Record<number, boolean> = {};
+    instructors.forEach((_, i) => {
+      initial[i] = true;
+    });
+    return initial;
   });
 
   const {
@@ -521,7 +524,7 @@ export function Form2({
               register={register}
               errors={errors}
               formValues={formValues}
-              isOpen={openSections[index] ?? false}
+              isOpen={openSections[index] ?? true}
               onToggleOpen={() =>
                 setOpenSections((prev) => ({
                   ...prev,
