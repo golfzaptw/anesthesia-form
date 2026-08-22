@@ -6,7 +6,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { getCompletedForms, getFormConfig } from "@/lib/firestore";
 import type { FormConfig } from "@/lib/formData";
 import { Form2 } from "@/components/forms/Form2";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Loader2 } from "lucide-react";
 import Link from "next/link";
 
 export default function Form2Page() {
@@ -38,28 +38,42 @@ export default function Form2Page() {
 
   if (loading || !user || !config) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center gap-3">
+        <div className="w-12 h-12 rounded-2xl bg-indigo-600/10 border border-indigo-200 flex items-center justify-center text-indigo-600">
+          <Loader2 className="w-6 h-6 animate-spin" />
+        </div>
+        <p className="text-sm font-medium text-slate-500">กำลังโหลดแบบประเมินอาจารย์...</p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-2xl mx-auto px-4 py-6">
-        <Link
-          href="/hub"
-          className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-blue-600 mb-4 transition-colors"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          กลับหน้าหลัก
-        </Link>
+    <div className="min-h-screen bg-gradient-to-b from-indigo-50/40 via-slate-50 to-blue-50/30 pb-16">
+      {/* Top Navigation Bar */}
+      <header className="sticky top-0 z-30 bg-white/80 backdrop-blur-md border-b border-slate-200/80 px-4 py-3">
+        <div className="max-w-2xl mx-auto flex items-center justify-between">
+          <Link
+            href="/hub"
+            className="inline-flex items-center gap-2 text-xs sm:text-sm font-semibold text-slate-600 hover:text-indigo-600 bg-slate-100 hover:bg-indigo-50 px-3 py-1.5 rounded-xl transition-all border border-slate-200 hover:border-indigo-200"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            <span>กลับหน้าหลัก</span>
+          </Link>
+
+          <div className="flex items-center gap-2 text-xs font-semibold text-slate-500">
+            <span className="w-2 h-2 rounded-full bg-indigo-500 inline-block animate-pulse" />
+            <span>โหมดประเมินอาจารย์</span>
+          </div>
+        </div>
+      </header>
+
+      <main className="max-w-2xl mx-auto px-4 pt-6">
         <Form2 
           userId={user.uid} 
           instructors={config.form2Instructors} 
           questions={config.form2Questions} 
         />
-      </div>
+      </main>
     </div>
   );
 }
