@@ -7,6 +7,7 @@ import toast from "react-hot-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { Stethoscope, Eye, EyeOff } from "lucide-react";
 import { isAdmin } from "@/lib/admin";
+import { Footer } from "@/components/ui/Footer";
 
 interface FormValues {
   displayName: string;
@@ -296,6 +297,7 @@ export function LoginForm() {
           </form>
         </div>
       )}
+      <Footer className="absolute bottom-1 left-0 right-0" />
     </div>
   );
 }

@@ -13,6 +13,7 @@ import { isAdmin, HAS_ADMINS } from "@/lib/admin";
 import { getFormsMeta, type FormConfig } from "@/lib/formData";
 import type { FormId, FormCardMeta } from "@/types";
 import toast from "react-hot-toast";
+import { Footer } from "@/components/ui/Footer";
 
 export default function HubPage() {
   const { user, loading, signOut } = useAuth();
@@ -256,6 +257,8 @@ export default function HubPage() {
             />
           ))}
         </div>
+
+        <Footer className="mt-8 pb-8" />
       </main>
     </div>
   );

@@ -18,6 +18,7 @@ import { StatCard } from "@/components/admin/StatCard";
 import { ScoreBar } from "@/components/admin/ScoreBar";
 import { Collapsible } from "@/components/admin/Collapsible";
 import { FormEditor } from "@/components/admin/FormEditor";
+import { Footer } from "@/components/ui/Footer";
 import {
   LogOut,
   Users,
@@ -925,6 +926,9 @@ export default function AdminPage() {
             </div>
           </div>
         )}
+
+        {/* Footer Credits */}
+        <Footer className="mt-12 pb-8 border-t border-slate-200/60" />
       </main>
     </div>
   );

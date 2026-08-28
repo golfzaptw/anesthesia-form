@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Sarabun } from "next/font/google";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { Toaster } from "react-hot-toast";
+import { ConsoleSignature } from "@/components/common/ConsoleSignature";
 import "./globals.css";
 
 const sarabun = Sarabun({
@@ -13,6 +14,9 @@ const sarabun = Sarabun({
 export const metadata: Metadata = {
   title: "แบบประเมินความพึงพอใจ — พยาบาลวิสัญญี",
   description: "Student satisfaction survey for anesthesia nursing program",
+  authors: [{ name: "Chutikan Sangsup" }],
+  creator: "Chutikan Sangsup",
+  publisher: "Nurse Anesthesia, Phramongkutklao Hospital",
 };
 
 export default function RootLayout({
@@ -24,6 +28,7 @@ export default function RootLayout({
     <html lang="th">
       <body className={`${sarabun.variable} font-sans bg-gray-50 text-gray-800`}>
         <AuthProvider>
+          <ConsoleSignature />
           {children}
           <Toaster
             position="top-center"
