@@ -64,7 +64,14 @@ export function TextAreaInput({
         className={`w-full rounded-xl border p-3 text-sm text-slate-800 bg-slate-50/50 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all resize-y ${
           error ? "border-rose-400 bg-rose-50/30" : "border-slate-200"
         }`}
-        {...register(name, required ? { required: "กรุณากรอกข้อมูล" } : {})}
+        {...register(name, {
+          validate: (val) => {
+            if (required && (!val || typeof val !== "string" || !val.trim())) {
+              return "กรุณากรอกข้อเสนอแนะเพิ่มเติม";
+            }
+            return true;
+          },
+        })}
       />
 
       {error && (

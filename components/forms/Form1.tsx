@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
@@ -31,10 +31,25 @@ export function Form1({
     register,
     handleSubmit,
     watch,
+    clearErrors,
     formState: { errors },
   } = useForm<Form1Values>();
 
   const formValues = watch();
+
+  // Auto-clear suggestion errors when score changes to >= 3
+  useEffect(() => {
+    questions.forEach((_, i) => {
+      const num = i + 1;
+      const scoreKey = `q${num}_score`;
+      const suggKey = `q${num}_suggestion`;
+      const currentScore = Number(formValues[scoreKey] || 0);
+      const isRequired = currentScore > 0 && currentScore <= 2;
+      if (!isRequired && errors[suggKey]) {
+        clearErrors(suggKey);
+      }
+    });
+  }, [formValues, questions, errors, clearErrors]);
 
   // Calculate live completion progress
   const { answeredCount, totalCount, progressPercent } = useMemo(() => {
@@ -177,6 +192,11 @@ export function Form1({
                 register={register}
                 error={errors[scoreKey]}
                 value={formValues[scoreKey]}
+                onChange={(val) => {
+                  if (Number(val) > 2) {
+                    clearErrors(suggKey);
+                  }
+                }}
                 required
               />
 
