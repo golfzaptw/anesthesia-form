@@ -10,7 +10,6 @@ import {
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
-  signInAnonymously,
   signOut as firebaseSignOut,
   deleteUser as deleteAuthUser,
   onAuthStateChanged,
@@ -19,14 +18,11 @@ import {
 import {
   doc,
   setDoc,
-  getDocs,
-  query,
-  collection,
-  where,
+  getDoc,
   serverTimestamp,
 } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
-import { getOrCreateUserDoc } from "@/lib/firestore";
+import { getOrCreateUserDoc, nameToSlug } from "@/lib/firestore";
 import { IS_MOCK } from "@/lib/mockMode";
 import {
   mockOnAuthStateChanged,
@@ -96,35 +92,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const registerAsGuest = async (displayName: string) => {
     if (IS_MOCK) return mockRegisterGuest(displayName);
     const trimmedName = displayName.trim();
+    const slug = nameToSlug(trimmedName);
+
+    // 1. Direct check on evaluator_names document
+    const nameRef = doc(db, "evaluator_names", slug);
+    const nameSnap = await getDoc(nameRef);
+    if (nameSnap.exists()) {
+      throw new Error("auth/display-name-already-in-use");
+    }
+
     const uniqueEmail = `eval_${Date.now()}_${Math.random().toString(36).slice(2, 7)}@evaluator.local`;
     const generatedPassword = Math.random().toString(36).slice(-6).toUpperCase();
 
-    // 1. Create a fresh Firebase Auth user
+    // 2. Create fresh Firebase Auth user
     const { user: guestUser } = await createUserWithEmailAndPassword(auth, uniqueEmail, generatedPassword);
 
     try {
-      // 2. Check if an active user with this displayName already exists in Firestore
-      const usersSnap = await getDocs(
-        query(collection(db, "users"), where("displayName", "==", trimmedName))
-      );
-
-      const existingActive = usersSnap.docs.filter((d) => d.id !== guestUser.uid);
-      if (existingActive.length > 0) {
-        // Clean up the newly created Auth user immediately
-        await deleteAuthUser(guestUser).catch(() => {});
-        await firebaseSignOut(auth);
-        throw new Error("auth/display-name-already-in-use");
-      }
-
-      // 3. Save to Firestore
       await updateProfile(guestUser, { displayName: trimmedName });
-      await setDoc(doc(db, "users", guestUser.uid), {
-        email: uniqueEmail,
-        displayName: trimmedName,
-        guestPassword: generatedPassword,
-        createdAt: serverTimestamp(),
-        completedForms: [] as FormId[],
-      });
+
+      // 3. Save to both evaluator_names and users
+      await Promise.all([
+        setDoc(nameRef, {
+          uid: guestUser.uid,
+          email: uniqueEmail,
+          displayName: trimmedName,
+          createdAt: serverTimestamp(),
+        }),
+        setDoc(doc(db, "users", guestUser.uid), {
+          email: uniqueEmail,
+          displayName: trimmedName,
+          createdAt: serverTimestamp(),
+          completedForms: [] as FormId[],
+        }),
+      ]);
 
       setUser({ uid: guestUser.uid, email: uniqueEmail, displayName: trimmedName });
       return generatedPassword;
@@ -141,30 +141,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (IS_MOCK) return mockLoginGuest(displayName, password);
     const trimmedName = displayName.trim();
     const trimmedPass = password.trim();
+    const slug = nameToSlug(trimmedName);
 
-    if (!auth.currentUser) {
-      try {
-        await signInAnonymously(auth);
-      } catch {
-        // Anonymous auth not enabled, proceed to query directly
-      }
+    const nameRef = doc(db, "evaluator_names", slug);
+    const nameSnap = await getDoc(nameRef);
+
+    let targetEmail: string;
+    if (nameSnap.exists()) {
+      targetEmail = nameSnap.data().email as string;
+    } else {
+      // Fallback for legacy accounts
+      targetEmail = `${trimmedName.toLowerCase().replace(/\s+/g, "-")}@evaluator.local`;
     }
 
-    const usersSnap = await getDocs(
-      query(collection(db, "users"), where("displayName", "==", trimmedName))
-    );
-
-    if (usersSnap.empty) {
-      if (auth.currentUser && auth.currentUser.isAnonymous) {
-        await firebaseSignOut(auth);
-      }
-      throw new Error("auth/user-not-found");
-    }
-
-    const userDocData = usersSnap.docs[0].data();
-    const userEmail = userDocData.email as string;
-
-    const { user: guestUser } = await signInWithEmailAndPassword(auth, userEmail, trimmedPass);
+    const { user: guestUser } = await signInWithEmailAndPassword(auth, targetEmail, trimmedPass);
     setUser({ uid: guestUser.uid, email: guestUser.email, displayName: guestUser.displayName || trimmedName });
   };
 

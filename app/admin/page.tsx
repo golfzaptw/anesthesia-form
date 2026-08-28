@@ -187,7 +187,7 @@ export default function AdminPage() {
     if (!userToDelete) return;
     try {
       setIsDeleting(true);
-      await deleteUser(userToDelete.uid, userToDelete.email);
+      await deleteUser(userToDelete.uid, userToDelete.email, userToDelete.displayName);
       setUsers((prev) => prev.filter((u) => u.uid !== userToDelete.uid));
       setSubmissions((prev) =>
         prev.filter(

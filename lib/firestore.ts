@@ -136,13 +136,26 @@ export async function getAllUsers(): Promise<UserSummary[]> {
   });
 }
 
-export async function deleteUser(uid: string, email?: string): Promise<void> {
+export function nameToSlug(name: string): string {
+  return encodeURIComponent(name.trim().toLowerCase().replace(/\s+/g, "_"));
+}
+
+export async function deleteUser(uid: string, email?: string, displayName?: string): Promise<void> {
   if (IS_MOCK) return mockDeleteUser(uid, email);
 
   // 1. Delete user document from 'users'
   await deleteDoc(doc(db, "users", uid));
 
-  // 2. Query and delete all submissions by this user
+  // 2. Delete evaluator_names entry if displayName provided
+  if (displayName) {
+    try {
+      await deleteDoc(doc(db, "evaluator_names", nameToSlug(displayName)));
+    } catch (e) {
+      console.warn("Warning deleting evaluator_names doc:", e);
+    }
+  }
+
+  // 3. Query and delete all submissions by this user
   try {
     const subSnap = await getDocs(
       query(collection(db, "form_submissions"), where("userId", "==", uid))
