@@ -19,7 +19,7 @@ import {
   AlertCircle,
   AlertTriangle,
 } from "lucide-react";
-import type { DepartmentData } from "@/lib/formData";
+import { type DepartmentData, isDeptAllowSkip } from "@/lib/formData";
 
 type Form3Values = Record<string, string>;
 
@@ -36,6 +36,7 @@ function DeptSection({
   isOpen,
   onToggleOpen,
   searchTerm,
+  allowSkip = false,
 }: {
   dept: string;
   staff: string[];
@@ -46,19 +47,34 @@ function DeptSection({
   isOpen: boolean;
   onToggleOpen: () => void;
   searchTerm?: string;
+  allowSkip?: boolean;
 }) {
-  // Count how many staff in this department have feedback entered
+  // Count how many staff in this department are completed
   const { filledCount, hasErrors } = useMemo(() => {
     let count = 0;
     let err = false;
     staff.forEach((_, si) => {
+      const metKey = `d${deptIndex}_s${si}_met`;
       const fieldKey = `d${deptIndex}_s${si}`;
+      const metVal = formValues[metKey];
       const val = formValues[fieldKey];
-      if (val && val.trim().length > 0) count += 1;
+
+      if (allowSkip) {
+        // allowSkip: done = ไม่เคย OR (เคย + filled feedback)
+        if (metVal === "ไม่เคย") {
+          count += 1;
+        } else if (metVal === "เคย" && val && val.trim().length > 0) {
+          count += 1;
+        }
+      } else {
+        // No skip: done = filled feedback
+        if (val && val.trim().length > 0) count += 1;
+      }
       if (errors[fieldKey]) err = true;
+      if (allowSkip && errors[metKey]) err = true;
     });
     return { filledCount: count, hasErrors: err };
-  }, [staff, deptIndex, formValues, errors]);
+  }, [staff, deptIndex, formValues, errors, allowSkip]);
 
   const isAllFilled = filledCount === staff.length;
 
@@ -106,7 +122,7 @@ function DeptSection({
             </span>
             <span className="text-xs text-teal-700 font-medium flex items-center gap-1 mt-0.5">
               <Users className="w-3.5 h-3.5" />
-              <span>{staff.length} ท่าน (จำเป็นต้องกรอกทุกคน)</span>
+              <span>{staff.length} ท่าน {allowSkip ? "(กรุณาเลือก เคย/ไม่เคย ทุกท่าน)" : "(จำเป็นต้องกรอกทุกคน)"}</span>
             </span>
           </div>
         </div>
@@ -138,18 +154,26 @@ function DeptSection({
         <div className="p-4 sm:p-6 space-y-4 border-t border-teal-100/60 bg-slate-50/40">
           {filteredStaff.map(({ name, index }) => {
             const fieldKey = `d${deptIndex}_s${index}`;
+            const metKey = `d${deptIndex}_s${index}_met`;
+            const metValue = formValues[metKey] || "";
             const currentValue = formValues[fieldKey] || "";
             const isFilled = currentValue.trim().length > 0;
             const fieldError = errors[fieldKey];
+            const metError = errors[metKey];
+
+            // Should this staff show textarea?
+            const showTextarea = allowSkip ? metValue === "เคย" : true;
 
             return (
               <div
                 key={index}
-                className={`rounded-2xl border p-4 sm:p-5 transition-all duration-150 ${fieldError
+                className={`rounded-2xl border p-4 sm:p-5 transition-all duration-150 ${(allowSkip && metError) || fieldError
                   ? "border-rose-300 bg-rose-50/30 ring-1 ring-rose-300"
                   : isFilled
                     ? "border-teal-200 bg-white shadow-sm ring-1 ring-teal-200/50"
-                    : "border-slate-200/80 bg-white hover:border-slate-300 shadow-sm"
+                    : allowSkip && metValue === "ไม่เคย"
+                      ? "border-slate-200/80 bg-slate-50/60 shadow-sm"
+                      : "border-slate-200/80 bg-white hover:border-slate-300 shadow-sm"
                   }`}
               >
                 <div className="flex items-start justify-between gap-3 mb-2.5">
@@ -172,26 +196,68 @@ function DeptSection({
                       ระบุข้อความแล้ว
                     </span>
                   )}
+                  {allowSkip && metValue === "ไม่เคย" && (
+                    <span className="text-[11px] font-semibold text-slate-500 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-full shrink-0">
+                      ไม่เคยเจอ
+                    </span>
+                  )}
                 </div>
 
-                <div className="relative mt-2">
-                  <textarea
-                    rows={2}
-                    placeholder={`กรุณาระบุข้อเสนอแนะ ความประทับใจ หรือข้อคิดเห็นสำหรับ ${name}...`}
-                    className={`w-full rounded-xl border p-3 text-sm text-slate-800 bg-slate-50/50 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all resize-y ${fieldError ? "border-rose-400 bg-rose-50/20" : "border-slate-200"
-                      }`}
-                    {...register(fieldKey, {
-                      required: "กรุณาระบุข้อคิดเห็น/ข้อเสนอแนะสำหรับท่านนี้",
-                      validate: (v) => (v && v.trim().length > 0) || "กรุณากรอกข้อความ",
-                    })}
-                  />
-                </div>
+                {/* Met / Not Met Radio — only for allowSkip departments */}
+                {allowSkip && (
+                  <div className="bg-slate-50 rounded-xl border border-slate-200 p-3 mt-2">
+                    <p className="text-xs font-semibold text-slate-700 mb-2">
+                      เคยเจอท่านนี้หรือไม่
+                      <span className="text-rose-500 ml-1">*</span>
+                    </p>
+                    <div className="flex items-center gap-4">
+                      {[
+                        { value: "เคย", label: "เคย" },
+                        { value: "ไม่เคย", label: "ไม่เคย" },
+                      ].map((opt) => (
+                        <label key={opt.value} className="flex items-center gap-1.5 cursor-pointer">
+                          <input
+                            type="radio"
+                            value={opt.value}
+                            className="accent-teal-600"
+                            {...register(metKey, { required: "กรุณาเลือก" })}
+                          />
+                          <span className="text-sm text-slate-700">{opt.label}</span>
+                        </label>
+                      ))}
+                    </div>
+                    {metError && (
+                      <p className="text-rose-600 text-xs font-medium mt-1.5 flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-rose-500 inline-block" />
+                        {metError.message as string}
+                      </p>
+                    )}
+                  </div>
+                )}
 
-                {fieldError && (
-                  <p className="text-rose-600 text-xs font-medium mt-1.5 flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-rose-500 inline-block" />
-                    {fieldError.message as string}
-                  </p>
+                {/* Textarea */}
+                {showTextarea && (
+                  <>
+                    <div className="relative mt-3">
+                      <textarea
+                        rows={2}
+                        placeholder={`กรุณาระบุข้อเสนอแนะ ความประทับใจ หรือข้อคิดเห็นสำหรับ ${name}...`}
+                        className={`w-full rounded-xl border p-3 text-sm text-slate-800 bg-slate-50/50 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all resize-y ${fieldError ? "border-rose-400 bg-rose-50/20" : "border-slate-200"
+                          }`}
+                        {...register(fieldKey, {
+                          required: "กรุณาระบุข้อคิดเห็น/ข้อเสนอแนะสำหรับท่านนี้",
+                          validate: (v) => (v && v.trim().length > 0) || "กรุณากรอกข้อความ",
+                        })}
+                      />
+                    </div>
+
+                    {fieldError && (
+                      <p className="text-rose-600 text-xs font-medium mt-1.5 flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-rose-500 inline-block" />
+                        {fieldError.message as string}
+                      </p>
+                    )}
+                  </>
                 )}
               </div>
             );
@@ -231,16 +297,27 @@ export function Form3({
 
   const formValues = watch();
 
-  // Calculate total staff & total feedback written
+  // Calculate total staff & total completed
   const { totalStaffCount, filledFeedbackCount, percent } = useMemo(() => {
     let total = 0;
     let filled = 0;
 
     departments.forEach((d, di) => {
       total += d.staff.length;
+      const allowSkip = isDeptAllowSkip(d);
       d.staff.forEach((_, si) => {
         const val = formValues[`d${di}_s${si}`];
-        if (val && val.trim().length > 0) filled += 1;
+
+        if (allowSkip) {
+          const metVal = formValues[`d${di}_s${si}_met`];
+          if (metVal === "ไม่เคย") {
+            filled += 1;
+          } else if (metVal === "เคย" && val && val.trim().length > 0) {
+            filled += 1;
+          }
+        } else {
+          if (val && val.trim().length > 0) filled += 1;
+        }
       });
     });
 
@@ -288,7 +365,7 @@ export function Form3({
 
     departments.forEach((d, di) => {
       d.staff.forEach((_, si) => {
-        if (formErrors[`d${di}_s${si}`]) {
+        if (formErrors[`d${di}_s${si}`] || formErrors[`d${di}_s${si}_met`]) {
           nextOpen[di] = true;
           if (firstErrorDept === -1) firstErrorDept = di;
         }
@@ -296,7 +373,7 @@ export function Form3({
     });
 
     setOpenDepts(nextOpen);
-    toast.error("กรุณาระบุข้อเสนอแนะให้ครบทุกคน (จำเป็นต้องใส่ครบทุกท่าน)");
+    toast.error("กรุณาเลือก เคย/ไม่เคย และกรอกข้อเสนอแนะให้ครบทุกท่านที่เคยเจอ");
   };
 
   return (
@@ -319,7 +396,7 @@ export function Form3({
           <div className="mt-5 pt-4 border-t border-white/15 text-xs text-teal-200 flex items-center gap-1.5">
             <AlertCircle className="w-4 h-4 text-amber-300 shrink-0" />
             <span className="font-semibold text-white">
-              * กรอกข้อเสนอแนะหรือความคิดเห็นให้ครบทุกท่าน ({totalStaffCount} ท่าน)
+              * กรุณาเลือกว่าเคยหรือไม่เคยเจอทุกท่าน หากเคยเจอกรุณากรอกข้อเสนอแนะ
             </span>
           </div>
         </div>
@@ -402,6 +479,7 @@ export function Form3({
               }))
             }
             searchTerm={searchTerm}
+            allowSkip={isDeptAllowSkip(d)}
           />
         ))}
       </div>

@@ -349,16 +349,36 @@ export default function AdminPage() {
             <p className="text-xs text-gray-400">จาก {byForm.form_3.length} คำตอบ</p>
             {form3.map((d) => {
               const total = d.staff.reduce((acc, s) => acc + s.comments.length, 0);
+              const totalMet = d.staff.reduce((acc, s) => acc + s.metCount, 0);
               return (
                 <Collapsible
                   key={d.dept}
                   title={d.dept}
-                  badge={`${total} ความเห็น`}
+                  badge={d.allowSkip
+                    ? `${total} ความเห็น · เคยเจอรวม ${totalMet} ครั้ง`
+                    : `${total} ความเห็น`
+                  }
                 >
                   <ul className="divide-y divide-gray-100 pt-1">
                     {d.staff.map((s) => (
                       <li key={s.name} className="py-3">
-                        <p className="text-sm font-medium text-gray-800">{s.name}</p>
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-sm font-medium text-gray-800">{s.name}</p>
+                          {d.allowSkip && (
+                            <div className="flex items-center gap-2 text-xs shrink-0">
+                              {s.metCount > 0 && (
+                                <span className="px-2 py-0.5 rounded-full bg-green-50 text-green-700 border border-green-200 font-medium">
+                                  เคยเจอ {s.metCount}
+                                </span>
+                              )}
+                              {s.notMetCount > 0 && (
+                                <span className="px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 border border-gray-200 font-medium">
+                                  ไม่เคยเจอ {s.notMetCount}
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </div>
                         {s.comments.length === 0 ? (
                           <p className="text-xs text-gray-300 mt-0.5">ยังไม่มีความเห็น</p>
                         ) : (

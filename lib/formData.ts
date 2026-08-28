@@ -68,6 +68,19 @@ export const FORM2_EVAL_QUESTIONS = [
 export interface DepartmentData {
   dept: string;
   staff: string[];
+  allowSkip?: boolean;
+}
+
+export function isDeptAllowSkip(dept: DepartmentData): boolean {
+  if (dept.allowSkip !== undefined) {
+    return Boolean(dept.allowSkip);
+  }
+  const name = dept.dept || "";
+  return (
+    name.includes("นายสิบ") ||
+    name.includes("ผู้ช่วย") ||
+    name.includes("พนักงานช่วย")
+  );
 }
 
 export interface FormConfig {
@@ -203,6 +216,7 @@ export const FORM3_DEPARTMENTS: DepartmentData[] = [
   },
   {
     dept: "นายสิบพยาบาล, ผู้ช่วยและพนักงานช่วยการพยาบาล (วิสัญญี)",
+    allowSkip: true,
     staff: [
       "จ.ส.อ.หญิง สายหยุด จุมพลเดชา",
       "จ.ส.อ.หญิง ดวงกมล เกตุจินดา",

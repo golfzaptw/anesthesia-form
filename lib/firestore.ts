@@ -34,6 +34,7 @@ import {
   FORM2_INSTRUCTORS,
   FORM3_DEPARTMENTS,
   type FormConfig,
+  isDeptAllowSkip,
 } from "./formData";
 
 export async function getOrCreateUserDoc(
@@ -145,7 +146,14 @@ export async function getFormConfig(): Promise<FormConfig> {
   const configSnap = await getDoc(configRef);
   
   if (configSnap.exists()) {
-    return configSnap.data() as FormConfig;
+    const data = configSnap.data() as FormConfig;
+    if (data.form3Departments) {
+      data.form3Departments = data.form3Departments.map((d) => ({
+        ...d,
+        allowSkip: isDeptAllowSkip(d),
+      }));
+    }
+    return data;
   }
   
   // If no config found, initialize it

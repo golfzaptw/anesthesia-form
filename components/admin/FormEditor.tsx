@@ -2,12 +2,13 @@
 
 import { useState } from "react";
 import type { FormConfig } from "@/lib/formData";
+import { isDeptAllowSkip } from "@/lib/formData";
 import { saveFormConfig } from "@/lib/firestore";
 import toast from "react-hot-toast";
 import Link from "next/link";
 import { Eye, Plus, Trash2, ChevronUp, ChevronDown } from "lucide-react";
 
-type DeptWithId = { dept: string; staff: string[]; _id: string };
+type DeptWithId = { dept: string; staff: string[]; _id: string; allowSkip?: boolean };
 type ConfigWithIds = Omit<FormConfig, "form3Departments"> & { form3Departments: DeptWithId[] };
 
 export function FormEditor({
@@ -22,6 +23,9 @@ export function FormEditor({
     // Add _id for React keys
     c.form3Departments.forEach((d: DeptWithId) => {
       d._id = Math.random().toString(36).slice(2);
+      if (d.allowSkip === undefined) {
+        d.allowSkip = isDeptAllowSkip(d);
+      }
     });
     return c as ConfigWithIds;
   });
@@ -34,6 +38,7 @@ export function FormEditor({
       configToSave.form3Departments = config.form3Departments.map((d) => ({
         dept: d.dept,
         staff: d.staff,
+        allowSkip: d.allowSkip !== undefined ? d.allowSkip : isDeptAllowSkip(d),
       }));
       await saveFormConfig(configToSave);
       onSave(configToSave);
@@ -68,12 +73,19 @@ export function FormEditor({
     setConfig({ ...config, form3Departments: newDepts });
   };
 
+  const handleUpdateDeptAllowSkip = (id: string, allowSkip: boolean) => {
+    const newDepts = config.form3Departments.map((d) =>
+      d._id === id ? { ...d, allowSkip } : d
+    );
+    setConfig({ ...config, form3Departments: newDepts });
+  };
+
   const handleAddDept = () => {
     setConfig({
       ...config,
       form3Departments: [
         ...config.form3Departments,
-        { _id: Math.random().toString(36).slice(2), dept: "", staff: [] },
+        { _id: Math.random().toString(36).slice(2), dept: "", staff: [], allowSkip: false },
       ]
     });
   };
@@ -259,13 +271,25 @@ export function FormEditor({
                 </div>
                 
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">รายชื่อพยาบาล (1 บรรทัดต่อ 1 ชื่อ)</label>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">รายชื่อพยาบาล/เจ้าหน้าที่ (1 บรรทัดต่อ 1 ชื่อ)</label>
                   <textarea
                     className="w-full h-32 p-3 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white"
                     defaultValue={dept.staff.join("\n")}
                     placeholder="ร.ท.หญิง กรภัธร...&#10;ร.ต.หญิง พรประภา..."
                     onChange={(e) => handleUpdateDeptStaff(dept._id, e.target.value)}
                   />
+                </div>
+
+                <div className="pt-1">
+                  <label className="flex items-center gap-2 cursor-pointer text-xs font-medium text-gray-700 bg-white border border-gray-200 rounded-lg p-2.5 hover:bg-gray-50 transition-colors">
+                    <input
+                      type="checkbox"
+                      className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-gray-300"
+                      checked={dept.allowSkip !== undefined ? dept.allowSkip : isDeptAllowSkip(dept)}
+                      onChange={(e) => handleUpdateDeptAllowSkip(dept._id, e.target.checked)}
+                    />
+                    <span>เปิดให้เลือก เคย/ไม่เคยเจอ (สำหรับตำแหน่งที่อาจไม่ได้พบทุกคน เช่น นายสิบ/ผู้ช่วยฯ)</span>
+                  </label>
                 </div>
               </div>
             ))}

@@ -1,4 +1,4 @@
-import type { FormConfig } from "./formData";
+import { type FormConfig, isDeptAllowSkip } from "./formData";
 import type { StoredSubmission } from "@/types";
 
 export interface ScoreStat {
@@ -101,17 +101,24 @@ export function analyseForm2(subs: StoredSubmission[], config: FormConfig): Inst
 
 export interface StaffFeedback {
   dept: string;
-  staff: { name: string; comments: CommentEntry[] }[];
+  allowSkip?: boolean;
+  staff: { name: string; metCount: number; notMetCount: number; comments: CommentEntry[] }[];
 }
 
 export function analyseForm3(subs: StoredSubmission[], config: FormConfig): StaffFeedback[] {
-  return config.form3Departments.map((d, di) => ({
-    dept: d.dept,
-    staff: d.staff.map((name, si) => ({
-      name,
-      comments: collectComments(subs, `d${di}_s${si}`, name),
-    })),
-  }));
+  return config.form3Departments.map((d, di) => {
+    const allowSkip = isDeptAllowSkip(d);
+    return {
+      dept: d.dept,
+      allowSkip,
+      staff: d.staff.map((name, si) => ({
+        name,
+        metCount: allowSkip ? subs.filter((s) => s.answers[`d${di}_s${si}_met`] === "เคย").length : 0,
+        notMetCount: allowSkip ? subs.filter((s) => s.answers[`d${di}_s${si}_met`] === "ไม่เคย").length : 0,
+        comments: collectComments(subs, `d${di}_s${si}`, name),
+      })),
+    };
+  });
 }
 
 export function overallAverage(scores: ScoreStat[]): number {
