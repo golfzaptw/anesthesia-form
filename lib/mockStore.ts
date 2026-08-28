@@ -1,8 +1,10 @@
 import type { AppUser, FormId, FormSubmission, StoredSubmission, UserSummary } from "@/types";
+import { DEFAULT_FORM_CONFIG, type FormConfig } from "@/lib/formData";
 
 const USERS_KEY = "mock_users";
 const SESSION_KEY = "mock_session";
 const SUBMISSIONS_KEY = "mock_submissions";
+const CONFIG_KEY = "mock_form_config";
 
 interface MockUserRecord {
   uid: string;
@@ -104,19 +106,18 @@ export async function mockSignOut(): Promise<void> {
 export async function mockRegisterGuest(displayName: string): Promise<string> {
   await delay();
   const users = getUsers();
-  const slug = displayName.toLowerCase().replace(/\s+/g, "-");
-  const email = `${slug}@evaluator.local`;
+  const trimmed = displayName.trim();
 
-  if (users.some((u) => u.email === email)) {
-    throw new Error("auth/email-already-in-use");
+  // Check if active user already exists with this name
+  if (users.some((u) => u.displayName.toLowerCase() === trimmed.toLowerCase())) {
+    throw new Error("auth/display-name-already-in-use");
   }
 
   const generatedPassword = Math.random().toString(36).slice(-6).toUpperCase();
-  
   const record: MockUserRecord = {
-    uid: `guest_${Date.now()}`,
-    email,
-    displayName,
+    uid: `guest_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+    email: `eval_${Date.now()}@evaluator.local`,
+    displayName: trimmed,
     password: generatedPassword,
     completedForms: [],
     createdAt: new Date().toISOString(),
@@ -135,9 +136,21 @@ export async function mockRegisterGuest(displayName: string): Promise<string> {
 }
 
 export async function mockLoginGuest(displayName: string, password: string): Promise<void> {
-  const slug = displayName.toLowerCase().replace(/\s+/g, "-");
-  const email = `${slug}@evaluator.local`;
-  return mockSignIn(email, password);
+  await delay();
+  const trimmed = displayName.trim();
+  const found = getUsers().find(
+    (u) => u.displayName.toLowerCase() === trimmed.toLowerCase()
+  );
+  if (!found) throw new Error("auth/user-not-found");
+  if (found.password !== password.trim()) throw new Error("auth/wrong-password");
+
+  const session: AppUser = {
+    uid: found.uid,
+    email: found.email,
+    displayName: found.displayName,
+  };
+  write(SESSION_KEY, session);
+  notify(session);
 }
 
 export async function mockGetCompletedForms(uid: string): Promise<FormId[]> {
@@ -192,10 +205,20 @@ export async function mockDeleteUser(uid: string, email?: string): Promise<void>
   write(SUBMISSIONS_KEY, submissions);
 }
 
+export async function mockGetFormConfig(): Promise<FormConfig> {
+  await delay();
+  return read<FormConfig>(CONFIG_KEY, DEFAULT_FORM_CONFIG);
+}
+
+export async function mockSaveFormConfig(config: FormConfig): Promise<void> {
+  await delay();
+  write(CONFIG_KEY, config);
+}
+
 /** Clears all mock data — handy for re-testing a form from scratch. */
 export function mockReset(): void {
   if (typeof window === "undefined") return;
-  [USERS_KEY, SESSION_KEY, SUBMISSIONS_KEY].forEach((k) =>
+  [USERS_KEY, SESSION_KEY, SUBMISSIONS_KEY, CONFIG_KEY].forEach((k) =>
     window.localStorage.removeItem(k)
   );
   notify(null);

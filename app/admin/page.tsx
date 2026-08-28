@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
-import { getAllSubmissions, getAllUsers, getFormConfig, deleteUser } from "@/lib/firestore";
+import { getAllSubmissions, getAllUsers, getFormConfig, deleteUser, saveFormConfig } from "@/lib/firestore";
 import { isAdmin, HAS_ADMINS } from "@/lib/admin";
 import { FORMS_META, type FormConfig } from "@/lib/formData";
 import {
@@ -29,6 +29,10 @@ import {
   BarChart3,
   Trash2,
   AlertTriangle,
+  Lock,
+  Unlock,
+  Clock,
+  Sliders,
 } from "lucide-react";
 import type { FormId, StoredSubmission, UserSummary } from "@/types";
 import toast from "react-hot-toast";
@@ -46,8 +50,14 @@ export default function AdminPage() {
   const [tab, setTab] = useState<Tab>("overview");
   const [userToDelete, setUserToDelete] = useState<UserSummary | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [now, setNow] = useState(Date.now());
 
   const allowed = !HAS_ADMINS || isAdmin(user?.email);
+
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     if (!loading && !user) router.replace("/login");
@@ -76,6 +86,45 @@ export default function AdminPage() {
   const form1 = useMemo(() => config ? analyseForm1(byForm.form_1, config) : { scores: [], comments: [] }, [byForm.form_1, config]);
   const form2 = useMemo(() => config ? analyseForm2(byForm.form_2, config) : [], [byForm.form_2, config]);
   const form3 = useMemo(() => config ? analyseForm3(byForm.form_3, config) : [], [byForm.form_3, config]);
+
+  const formLockStatus = useMemo(() => {
+    if (!config) return { state: "loading", label: "กำลังโหลดสถานะ...", desc: "", tone: "gray" };
+    if (config.isForceClosed) {
+      return {
+        state: "force_closed",
+        label: "ปิดการประเมินชั่วคราว (Force Closed)",
+        desc: "ผู้ดูแลระบบบังคับปิดรับการประเมิน — นักเรียนทุกคนไม่สามารถเข้าทำแบบประเมินได้",
+        tone: "red",
+      };
+    }
+    const startMs = config.startDate ? new Date(config.startDate).getTime() : 0;
+    const endMs = config.endDate ? new Date(config.endDate).getTime() : 0;
+
+    if (startMs > 0 && now < startMs) {
+      return {
+        state: "scheduled_future",
+        label: "ยังไม่ถึงเวลาเปิดให้ประเมิน",
+        desc: `กำหนดเปิดรับคำตอบในวันที่ ${new Date(startMs).toLocaleString("th-TH")}`,
+        tone: "blue",
+      };
+    }
+    if (endMs > 0 && now > endMs) {
+      return {
+        state: "expired",
+        label: "หมดเวลาการทำแบบประเมิน",
+        desc: `ปิดรับคำตอบแล้วเมื่อวันที่ ${new Date(endMs).toLocaleString("th-TH")}`,
+        tone: "gray",
+      };
+    }
+    return {
+      state: "open",
+      label: "เปิดรับการประเมินตามปกติ",
+      desc: endMs > 0 
+        ? `เปิดรับคำตอบอยู่ (จะปิดรับในวันที่ ${new Date(endMs).toLocaleString("th-TH")})`
+        : "เปิดรับคำตอบตลอดเวลา (ไม่มีกำหนดเวลาปิด)",
+      tone: "green",
+    };
+  }, [config, now]);
 
   if (loading || (user && allowed && fetching)) {
     return (
@@ -108,6 +157,19 @@ export default function AdminPage() {
       </div>
     );
   }
+
+  const handleQuickToggleForceClose = async () => {
+    if (!config) return;
+    const newClosed = !config.isForceClosed;
+    const newConfig: FormConfig = { ...config, isForceClosed: newClosed };
+    try {
+      await saveFormConfig(newConfig);
+      setConfig(newConfig);
+      toast.success(newClosed ? "🔒 บังคับปิดรับการประเมินแล้ว" : "🔓 เปิดรับการประเมินตามปกติแล้ว");
+    } catch {
+      toast.error("เกิดข้อผิดพลาดในการเปลี่ยนสถานะ");
+    }
+  };
 
   const totalPossible = users.length * FORMS_META.length;
   const completionRate = totalPossible
@@ -182,6 +244,91 @@ export default function AdminPage() {
       </header>
 
       <main className="max-w-4xl mx-auto px-4 py-6">
+        {/* Assessment Status & Quick Lock Control Card */}
+        {config && (
+          <div className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-5 mb-6 shadow-sm">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-start gap-3.5">
+                <div className={`p-2.5 sm:p-3 rounded-2xl shrink-0 ${
+                  formLockStatus.tone === "red" 
+                    ? "bg-red-50 text-red-600 border border-red-200" 
+                    : formLockStatus.tone === "green"
+                    ? "bg-emerald-50 text-emerald-600 border border-emerald-200"
+                    : formLockStatus.tone === "blue"
+                    ? "bg-blue-50 text-blue-600 border border-blue-200"
+                    : "bg-gray-100 text-gray-600 border border-gray-200"
+                }`}>
+                  {formLockStatus.tone === "red" ? (
+                    <Lock className="w-5 h-5" />
+                  ) : formLockStatus.tone === "green" ? (
+                    <Unlock className="w-5 h-5" />
+                  ) : (
+                    <Clock className="w-5 h-5" />
+                  )}
+                </div>
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-xs font-bold uppercase tracking-wider text-gray-400">สถานะระบบประเมิน:</span>
+                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold border ${
+                      formLockStatus.tone === "red"
+                        ? "bg-red-100/80 text-red-700 border-red-300"
+                        : formLockStatus.tone === "green"
+                        ? "bg-emerald-100/80 text-emerald-700 border-emerald-300"
+                        : formLockStatus.tone === "blue"
+                        ? "bg-blue-100/80 text-blue-700 border-blue-300"
+                        : "bg-gray-100 text-gray-700 border-gray-300"
+                    }`}>
+                      <span className={`w-2 h-2 rounded-full ${
+                        formLockStatus.tone === "red"
+                          ? "bg-red-500"
+                          : formLockStatus.tone === "green"
+                          ? "bg-emerald-500 animate-pulse"
+                          : formLockStatus.tone === "blue"
+                          ? "bg-blue-500"
+                          : "bg-gray-500"
+                      }`} />
+                      {formLockStatus.label}
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">{formLockStatus.desc}</p>
+                </div>
+              </div>
+
+              {/* Quick Actions */}
+              <div className="flex items-center gap-2 self-start sm:self-center shrink-0">
+                <button
+                  onClick={handleQuickToggleForceClose}
+                  className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm ${
+                    config.isForceClosed
+                      ? "bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-500/20"
+                      : "bg-red-600 hover:bg-red-700 text-white shadow-red-500/20"
+                  }`}
+                >
+                  {config.isForceClosed ? (
+                    <>
+                      <Unlock className="w-3.5 h-3.5" />
+                      เปิดให้ประเมิน
+                    </>
+                  ) : (
+                    <>
+                      <Lock className="w-3.5 h-3.5" />
+                      บังคับปิดฟอร์มชั่วคราว
+                    </>
+                  )}
+                </button>
+
+                <button
+                  onClick={() => setTab("editor")}
+                  className="px-3 py-2 rounded-xl text-xs font-semibold text-gray-600 hover:text-blue-600 bg-gray-100 hover:bg-blue-50 border border-gray-200 hover:border-blue-200 transition-colors flex items-center gap-1"
+                >
+                  <Sliders className="w-3.5 h-3.5" />
+                  กำหนดวัน/เวลา
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Summary stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
           <StatCard icon={Users} label="ผู้ลงทะเบียน" value={users.length} tone="blue" />

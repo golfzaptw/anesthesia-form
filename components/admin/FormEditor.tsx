@@ -6,7 +6,7 @@ import { isDeptAllowSkip } from "@/lib/formData";
 import { saveFormConfig } from "@/lib/firestore";
 import toast from "react-hot-toast";
 import Link from "next/link";
-import { Eye, Plus, Trash2, ChevronUp, ChevronDown } from "lucide-react";
+import { Eye, Plus, Trash2, ChevronUp, ChevronDown, Lock, Clock } from "lucide-react";
 
 type DeptWithId = { dept: string; staff: string[]; _id: string; allowSkip?: boolean };
 type ConfigWithIds = Omit<FormConfig, "form3Departments"> & { form3Departments: DeptWithId[] };
@@ -34,16 +34,24 @@ export function FormEditor({
   const handleSave = async () => {
     setSaving(true);
     try {
-      const configToSave = { ...config } as unknown as FormConfig;
-      configToSave.form3Departments = config.form3Departments.map((d) => ({
-        dept: d.dept,
-        staff: d.staff,
-        allowSkip: d.allowSkip !== undefined ? d.allowSkip : isDeptAllowSkip(d),
-      }));
+      const configToSave: FormConfig = {
+        form1Questions: config.form1Questions || [],
+        form2Instructors: config.form2Instructors || [],
+        form2Questions: config.form2Questions || [],
+        form3Departments: config.form3Departments.map((d) => ({
+          dept: d.dept || "",
+          staff: d.staff || [],
+          allowSkip: d.allowSkip !== undefined ? d.allowSkip : isDeptAllowSkip(d),
+        })),
+        isForceClosed: Boolean(config.isForceClosed),
+        startDate: config.startDate || "",
+        endDate: config.endDate || "",
+      };
       await saveFormConfig(configToSave);
       onSave(configToSave);
       toast.success("บันทึกการตั้งค่าสำเร็จ");
-    } catch {
+    } catch (err) {
+      console.error("Save config error:", err);
       toast.error("เกิดข้อผิดพลาดในการบันทึก");
     } finally {
       setSaving(false);
@@ -131,11 +139,27 @@ export function FormEditor({
         </button>
       </div>
 
-      <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-4">
-        <h3 className="font-medium text-sm text-gray-800 border-b pb-2">การเปิด-ปิด แบบประเมิน</h3>
-        <div className="grid md:grid-cols-3 gap-4">
-          <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">บังคับปิดฟอร์ม (Force Close)</label>
+      <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4 shadow-sm">
+        <div className="flex items-center justify-between border-b pb-3">
+          <div className="flex items-center gap-2 text-gray-800 font-semibold text-sm">
+            <Lock className="w-4 h-4 text-blue-600" />
+            <h3>การเปิด-ปิด และกำหนดเวลาแบบประเมิน</h3>
+          </div>
+          <span className={`text-xs font-bold px-2.5 py-1 rounded-full border ${
+            config.isForceClosed
+              ? "bg-red-50 text-red-700 border-red-200"
+              : "bg-emerald-50 text-emerald-700 border-emerald-200"
+          }`}>
+            {config.isForceClosed ? "● ปิดระบบอยู่ (Force Closed)" : "● เปิดรับคำตอบปกติ"}
+          </span>
+        </div>
+
+        <div className="grid md:grid-cols-3 gap-5">
+          <div className="bg-gray-50/80 p-3.5 rounded-xl border border-gray-200/70">
+            <label className="block text-xs font-semibold text-gray-700 mb-1.5 flex items-center gap-1.5">
+              <Lock className="w-3.5 h-3.5 text-red-500" />
+              บังคับปิดระบบ (Force Close)
+            </label>
             <label className="inline-flex items-center cursor-pointer mt-1">
               <input
                 type="checkbox"
@@ -143,29 +167,46 @@ export function FormEditor({
                 checked={!!config.isForceClosed}
                 onChange={(e) => setConfig({ ...config, isForceClosed: e.target.checked })}
               />
-              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-red-500"></div>
-              <span className="ml-3 text-sm font-medium text-gray-700">
-                {config.isForceClosed ? "ปิดฟอร์มอยู่" : "เปิดปกติ"}
+              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-red-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-red-600"></div>
+              <span className={`ml-3 text-xs font-bold ${config.isForceClosed ? "text-red-600" : "text-gray-600"}`}>
+                {config.isForceClosed ? "บังคับปิด (นักเรียนเข้าไม่ได้)" : "เปิดให้เข้าทำ"}
               </span>
             </label>
+            <p className="text-[11px] text-gray-400 mt-2">
+              หากเปิดใช้งาน จะปิดรับคำตอบทันที แม้จะอยู่ในช่วงเวลาก็ตาม
+            </p>
           </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">วัน-เวลา เริ่มต้น</label>
+
+          <div className="bg-gray-50/80 p-3.5 rounded-xl border border-gray-200/70">
+            <label className="block text-xs font-semibold text-gray-700 mb-1.5 flex items-center gap-1.5">
+              <Clock className="w-3.5 h-3.5 text-blue-500" />
+              วัน-เวลา เริ่มต้น
+            </label>
             <input
               type="datetime-local"
-              className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full border rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
               value={config.startDate || ""}
               onChange={(e) => setConfig({ ...config, startDate: e.target.value })}
             />
+            <p className="text-[11px] text-gray-400 mt-2">
+              (เว้นว่างได้) หากใส่ นักเรียนจะทำได้เมื่อถึงเวลานี้
+            </p>
           </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">วัน-เวลา สิ้นสุด</label>
+
+          <div className="bg-gray-50/80 p-3.5 rounded-xl border border-gray-200/70">
+            <label className="block text-xs font-semibold text-gray-700 mb-1.5 flex items-center gap-1.5">
+              <Clock className="w-3.5 h-3.5 text-amber-500" />
+              วัน-เวลา สิ้นสุด
+            </label>
             <input
               type="datetime-local"
-              className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full border rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
               value={config.endDate || ""}
               onChange={(e) => setConfig({ ...config, endDate: e.target.value })}
             />
+            <p className="text-[11px] text-gray-400 mt-2">
+              (เว้นว่างได้) หากใส่ จะแสดงเวลานับถอยหลังและปิดเมื่อหมดเวลา
+            </p>
           </div>
         </div>
       </div>

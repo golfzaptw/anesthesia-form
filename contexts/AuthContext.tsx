@@ -12,10 +12,20 @@ import {
   signInWithEmailAndPassword,
   signInAnonymously,
   signOut as firebaseSignOut,
+  deleteUser as deleteAuthUser,
   onAuthStateChanged,
   updateProfile,
 } from "firebase/auth";
-import { auth } from "@/lib/firebase";
+import {
+  doc,
+  setDoc,
+  getDocs,
+  query,
+  collection,
+  where,
+  serverTimestamp,
+} from "firebase/firestore";
+import { auth, db } from "@/lib/firebase";
 import { getOrCreateUserDoc } from "@/lib/firestore";
 import { IS_MOCK } from "@/lib/mockMode";
 import {
@@ -26,7 +36,7 @@ import {
   mockRegisterGuest,
   mockLoginGuest,
 } from "@/lib/mockStore";
-import type { AppUser } from "@/types";
+import type { AppUser, FormId } from "@/types";
 
 interface AuthContextValue {
   user: AppUser | null;
@@ -85,23 +95,77 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const registerAsGuest = async (displayName: string) => {
     if (IS_MOCK) return mockRegisterGuest(displayName);
-    const slug = displayName.toLowerCase().replace(/\s+/g, "-");
-    const email = `${slug}@evaluator.local`;
+    const trimmedName = displayName.trim();
+    const uniqueEmail = `eval_${Date.now()}_${Math.random().toString(36).slice(2, 7)}@evaluator.local`;
     const generatedPassword = Math.random().toString(36).slice(-6).toUpperCase();
-    const { user: guestUser } = await createUserWithEmailAndPassword(auth, email, generatedPassword);
-    await updateProfile(guestUser, { displayName });
-    await getOrCreateUserDoc(guestUser.uid, email, displayName);
-    setUser({ uid: guestUser.uid, email, displayName });
-    return generatedPassword;
+
+    // 1. Create a fresh Firebase Auth user
+    const { user: guestUser } = await createUserWithEmailAndPassword(auth, uniqueEmail, generatedPassword);
+
+    try {
+      // 2. Check if an active user with this displayName already exists in Firestore
+      const usersSnap = await getDocs(
+        query(collection(db, "users"), where("displayName", "==", trimmedName))
+      );
+
+      const existingActive = usersSnap.docs.filter((d) => d.id !== guestUser.uid);
+      if (existingActive.length > 0) {
+        // Clean up the newly created Auth user immediately
+        await deleteAuthUser(guestUser).catch(() => {});
+        await firebaseSignOut(auth);
+        throw new Error("auth/display-name-already-in-use");
+      }
+
+      // 3. Save to Firestore
+      await updateProfile(guestUser, { displayName: trimmedName });
+      await setDoc(doc(db, "users", guestUser.uid), {
+        email: uniqueEmail,
+        displayName: trimmedName,
+        guestPassword: generatedPassword,
+        createdAt: serverTimestamp(),
+        completedForms: [] as FormId[],
+      });
+
+      setUser({ uid: guestUser.uid, email: uniqueEmail, displayName: trimmedName });
+      return generatedPassword;
+    } catch (err) {
+      if (auth.currentUser && auth.currentUser.uid === guestUser.uid) {
+        await deleteAuthUser(guestUser).catch(() => {});
+        await firebaseSignOut(auth);
+      }
+      throw err;
+    }
   };
 
   const loginAsGuest = async (displayName: string, password: string) => {
     if (IS_MOCK) return mockLoginGuest(displayName, password);
-    const slug = displayName.toLowerCase().replace(/\s+/g, "-");
-    const email = `${slug}@evaluator.local`;
-    const { user: guestUser } = await signInWithEmailAndPassword(auth, email, password);
-    await getOrCreateUserDoc(guestUser.uid, email, displayName);
-    setUser({ uid: guestUser.uid, email, displayName });
+    const trimmedName = displayName.trim();
+    const trimmedPass = password.trim();
+
+    if (!auth.currentUser) {
+      try {
+        await signInAnonymously(auth);
+      } catch {
+        // Anonymous auth not enabled, proceed to query directly
+      }
+    }
+
+    const usersSnap = await getDocs(
+      query(collection(db, "users"), where("displayName", "==", trimmedName))
+    );
+
+    if (usersSnap.empty) {
+      if (auth.currentUser && auth.currentUser.isAnonymous) {
+        await firebaseSignOut(auth);
+      }
+      throw new Error("auth/user-not-found");
+    }
+
+    const userDocData = usersSnap.docs[0].data();
+    const userEmail = userDocData.email as string;
+
+    const { user: guestUser } = await signInWithEmailAndPassword(auth, userEmail, trimmedPass);
+    setUser({ uid: guestUser.uid, email: guestUser.email, displayName: guestUser.displayName || trimmedName });
   };
 
   const signOut = async () => {

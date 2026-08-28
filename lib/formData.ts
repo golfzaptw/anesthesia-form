@@ -239,3 +239,13 @@ export const FORM3_DEPARTMENTS: DepartmentData[] = [
     ],
   },
 ];
+
+export const DEFAULT_FORM_CONFIG: FormConfig = {
+  form1Questions: FORM1_QUESTIONS,
+  form2Instructors: FORM2_INSTRUCTORS,
+  form2Questions: FORM2_EVAL_QUESTIONS,
+  form3Departments: FORM3_DEPARTMENTS,
+  isForceClosed: false,
+  startDate: "",
+  endDate: "",
+};

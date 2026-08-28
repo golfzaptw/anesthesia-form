@@ -23,6 +23,8 @@ import {
   mockMarkFormComplete,
   mockSubmitFormResponse,
   mockDeleteUser,
+  mockGetFormConfig,
+  mockSaveFormConfig,
 } from "./mockStore";
 import type {
   FormId,
@@ -36,6 +38,7 @@ import {
   FORM2_EVAL_QUESTIONS,
   FORM2_INSTRUCTORS,
   FORM3_DEPARTMENTS,
+  DEFAULT_FORM_CONFIG,
   type FormConfig,
   isDeptAllowSkip,
 } from "./formData";
@@ -165,39 +168,54 @@ export async function deleteUser(uid: string, email?: string): Promise<void> {
   }
 }
 
-export const DEFAULT_FORM_CONFIG: FormConfig = {
-  form1Questions: FORM1_QUESTIONS,
-  form2Instructors: FORM2_INSTRUCTORS,
-  form2Questions: FORM2_EVAL_QUESTIONS,
-  form3Departments: FORM3_DEPARTMENTS,
-  isForceClosed: false,
-  startDate: "",
-  endDate: "",
-};
+export { DEFAULT_FORM_CONFIG };
 
 export async function getFormConfig(): Promise<FormConfig> {
-  if (IS_MOCK) return DEFAULT_FORM_CONFIG;
-  const configRef = doc(db, "config", "formData");
-  const configSnap = await getDoc(configRef);
-  
-  if (configSnap.exists()) {
-    const data = configSnap.data() as FormConfig;
-    if (data.form3Departments) {
-      data.form3Departments = data.form3Departments.map((d) => ({
-        ...d,
-        allowSkip: isDeptAllowSkip(d),
-      }));
+  if (IS_MOCK) return mockGetFormConfig();
+  try {
+    const configRef = doc(db, "config", "formData");
+    const configSnap = await getDoc(configRef);
+    
+    if (configSnap.exists()) {
+      const data = configSnap.data() as FormConfig;
+      return {
+        form1Questions: data.form1Questions || FORM1_QUESTIONS,
+        form2Instructors: data.form2Instructors || FORM2_INSTRUCTORS,
+        form2Questions: data.form2Questions || FORM2_EVAL_QUESTIONS,
+        form3Departments: (data.form3Departments || FORM3_DEPARTMENTS).map((d) => ({
+          ...d,
+          allowSkip: isDeptAllowSkip(d),
+        })),
+        isForceClosed: Boolean(data.isForceClosed),
+        startDate: data.startDate || "",
+        endDate: data.endDate || "",
+      };
     }
-    return data;
+    
+    // If no config found, initialize it
+    await setDoc(configRef, DEFAULT_FORM_CONFIG);
+    return DEFAULT_FORM_CONFIG;
+  } catch (err) {
+    console.warn("Could not fetch form config from Firestore:", err);
+    return DEFAULT_FORM_CONFIG;
   }
-  
-  // If no config found, initialize it
-  await setDoc(configRef, DEFAULT_FORM_CONFIG);
-  return DEFAULT_FORM_CONFIG;
 }
 
 export async function saveFormConfig(config: FormConfig): Promise<void> {
-  if (IS_MOCK) return;
+  if (IS_MOCK) return mockSaveFormConfig(config);
   const configRef = doc(db, "config", "formData");
-  await setDoc(configRef, config);
+  const cleanConfig: FormConfig = {
+    form1Questions: config.form1Questions || [],
+    form2Instructors: config.form2Instructors || [],
+    form2Questions: config.form2Questions || [],
+    form3Departments: (config.form3Departments || []).map((d) => ({
+      dept: d.dept || "",
+      staff: d.staff || [],
+      allowSkip: d.allowSkip !== undefined ? d.allowSkip : isDeptAllowSkip(d),
+    })),
+    isForceClosed: Boolean(config.isForceClosed),
+    startDate: config.startDate || "",
+    endDate: config.endDate || "",
+  };
+  await setDoc(configRef, cleanConfig);
 }

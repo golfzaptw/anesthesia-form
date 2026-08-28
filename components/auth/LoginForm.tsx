@@ -68,16 +68,16 @@ export function LoginForm() {
     } catch (err: unknown) {
       console.error("Auth Error:", err);
       const message = err instanceof Error ? err.message : String(err);
-      const friendly = message.includes("email-already-in-use")
+      const friendly = message.includes("email-already-in-use") || message.includes("display-name-already-in-use")
         ? isAdminTab ? "อีเมลนี้ถูกใช้แล้ว" : "มีคนใช้ชื่อนี้แล้ว กรุณาเลือกชื่ออื่น หรือเลือก 'กลับมาทำต่อ'"
         : message.includes("wrong-password") || message.includes("invalid-credential")
         ? "รหัสผ่านไม่ถูกต้อง"
         : message.includes("user-not-found")
-        ? (isAdminTab ? "ไม่พบบัญชีผู้ใช้" : "ไม่พบชื่อผู้ประเมินนี้ กรุณาสร้างชื่อใหม่")
+        ? (isAdminTab ? "ไม่พบบัญชีผู้ใช้" : "ไม่พบชื่อผู้ประเมินนี้ หรือบัญชีนี้อาจถูกลบไปแล้ว กรุณาสร้างชื่อใหม่")
         : message.includes("operation-not-allowed")
         ? "ระบบยังไม่เปิดใช้งาน (เช็ค Firebase Console)"
         : message.includes("permission-denied")
-        ? "Permission Denied: ลืมตั้งค่า Firestore Rules หรือเปล่า?"
+        ? "Permission Denied: ไม่มีสิทธิ์เข้าถึง Firestore"
         : `เกิดข้อผิดพลาด: ${message.slice(0, 50)}...`;
       toast.error(friendly);
     } finally {
