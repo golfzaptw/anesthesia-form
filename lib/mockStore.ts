@@ -181,6 +181,17 @@ export async function mockGetAllUsers(): Promise<UserSummary[]> {
   }));
 }
 
+export async function mockDeleteUser(uid: string, email?: string): Promise<void> {
+  await delay();
+  const users = getUsers().filter((u) => u.uid !== uid && (email ? u.email !== email : true));
+  write(USERS_KEY, users);
+
+  const submissions = read<StoredSubmission[]>(SUBMISSIONS_KEY, []).filter(
+    (s) => s.userId !== uid && (email ? s.userEmail !== email : true)
+  );
+  write(SUBMISSIONS_KEY, submissions);
+}
+
 /** Clears all mock data — handy for re-testing a form from scratch. */
 export function mockReset(): void {
   if (typeof window === "undefined") return;

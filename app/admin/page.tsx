@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
-import { getAllSubmissions, getAllUsers, getFormConfig } from "@/lib/firestore";
+import { getAllSubmissions, getAllUsers, getFormConfig, deleteUser } from "@/lib/firestore";
 import { isAdmin, HAS_ADMINS } from "@/lib/admin";
 import { FORMS_META, type FormConfig } from "@/lib/formData";
 import {
@@ -27,6 +27,8 @@ import {
   MessageSquare,
   ShieldAlert,
   BarChart3,
+  Trash2,
+  AlertTriangle,
 } from "lucide-react";
 import type { FormId, StoredSubmission, UserSummary } from "@/types";
 import toast from "react-hot-toast";
@@ -42,6 +44,8 @@ export default function AdminPage() {
   const [config, setConfig] = useState<FormConfig | null>(null);
   const [fetching, setFetching] = useState(true);
   const [tab, setTab] = useState<Tab>("overview");
+  const [userToDelete, setUserToDelete] = useState<UserSummary | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const allowed = !HAS_ADMINS || isAdmin(user?.email);
 
@@ -115,6 +119,34 @@ export default function AdminPage() {
     const subs = byForm[formId];
     if (!subs.length) return;
     downloadCsv(`${formId}_submissions.csv`, submissionsToCsv(subs));
+  };
+
+  const handleDeleteUser = async () => {
+    if (!userToDelete) return;
+    try {
+      setIsDeleting(true);
+      await deleteUser(userToDelete.uid, userToDelete.email);
+      setUsers((prev) => prev.filter((u) => u.uid !== userToDelete.uid));
+      setSubmissions((prev) =>
+        prev.filter(
+          (s) => s.userId !== userToDelete.uid && s.userEmail !== userToDelete.email
+        )
+      );
+      toast.success(
+        `ลบผู้เข้าร่วมประเมิน ${userToDelete.displayName || userToDelete.email} สำเร็จ`
+      );
+      setUserToDelete(null);
+    } catch (err: unknown) {
+      console.error("Failed to delete user:", err);
+      const message = err instanceof Error ? err.message : String(err);
+      if (message.includes("permission-denied")) {
+        toast.error("Permission Denied: ไม่มีสิทธิ์ลบข้อมูลใน Firebase (กรุณาตั้งค่า Firestore Rules)");
+      } else {
+        toast.error(`เกิดข้อผิดพลาดในการลบ: ${message.slice(0, 80)}`);
+      }
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   const TABS: { id: Tab; label: string }[] = [
@@ -233,6 +265,7 @@ export default function AdminPage() {
                         <th className="text-center font-medium px-2 py-2">ชุด 1</th>
                         <th className="text-center font-medium px-2 py-2">ชุด 2</th>
                         <th className="text-center font-medium px-2 py-2">ชุด 3</th>
+                        <th className="text-center font-medium px-2 py-2 w-20">จัดการ</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -251,6 +284,15 @@ export default function AdminPage() {
                               )}
                             </td>
                           ))}
+                          <td className="text-center px-2 py-2">
+                            <button
+                              onClick={() => setUserToDelete(u)}
+                              title="ลบผู้เข้าร่วมประเมิน"
+                              className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors inline-flex items-center justify-center"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -408,6 +450,71 @@ export default function AdminPage() {
             initialConfig={config}
             onSave={(newConfig) => setConfig(newConfig)}
           />
+        )}
+
+        {/* Delete Confirmation Modal */}
+        {userToDelete && (
+          <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl border border-gray-100 animate-in fade-in zoom-in-95 duration-150">
+              <div className="flex items-center gap-3 text-red-600 mb-4">
+                <div className="p-2.5 bg-red-50 rounded-xl">
+                  <AlertTriangle className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-gray-900">
+                    ยืนยันการลบผู้เข้าร่วมประเมิน
+                  </h3>
+                  <p className="text-xs text-gray-500">การดำเนินการนี้ไม่สามารถย้อนกลับได้</p>
+                </div>
+              </div>
+
+              <div className="bg-gray-50 rounded-xl p-3.5 border border-gray-100 mb-4">
+                <p className="text-sm font-semibold text-gray-800">
+                  {userToDelete.displayName || "ไม่ระบุชื่อ"}
+                </p>
+                <p className="text-xs text-gray-500 mt-0.5">{userToDelete.email}</p>
+                <div className="mt-2 pt-2 border-t border-gray-200/60 flex items-center justify-between text-xs text-gray-600">
+                  <span>ส่งแบบประเมินแล้ว:</span>
+                  <span className="font-semibold text-blue-600">
+                    {userToDelete.completedForms.length} / 3 ชุด
+                  </span>
+                </div>
+              </div>
+
+              <p className="text-xs text-gray-500 mb-6 leading-relaxed">
+                การลบผู้เข้าร่วมประเมินรายนี้จะลบข้อมูลแบบประเมินและคะแนนทั้งหมดที่ผู้ใช้เคยส่งออกจากระบบด้วย
+              </p>
+
+              <div className="flex justify-end gap-2.5">
+                <button
+                  type="button"
+                  disabled={isDeleting}
+                  onClick={() => setUserToDelete(null)}
+                  className="px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50"
+                >
+                  ยกเลิก
+                </button>
+                <button
+                  type="button"
+                  disabled={isDeleting}
+                  onClick={handleDeleteUser}
+                  className="px-4 py-2 text-sm font-medium bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors flex items-center gap-1.5 disabled:opacity-50"
+                >
+                  {isDeleting ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      กำลังลบ...
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="w-4 h-4" />
+                      ยืนยันการลบ
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
         )}
       </main>
     </div>

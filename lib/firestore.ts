@@ -3,9 +3,11 @@ import {
   getDoc,
   getDocs,
   query,
+  where,
   orderBy,
   setDoc,
   addDoc,
+  deleteDoc,
   collection,
   arrayUnion,
   updateDoc,
@@ -20,6 +22,7 @@ import {
   mockGetCompletedForms,
   mockMarkFormComplete,
   mockSubmitFormResponse,
+  mockDeleteUser,
 } from "./mockStore";
 import type {
   FormId,
@@ -128,6 +131,38 @@ export async function getAllUsers(): Promise<UserSummary[]> {
       createdAt: toIso(data.createdAt),
     };
   });
+}
+
+export async function deleteUser(uid: string, email?: string): Promise<void> {
+  if (IS_MOCK) return mockDeleteUser(uid, email);
+
+  // 1. Delete user document from 'users'
+  await deleteDoc(doc(db, "users", uid));
+
+  // 2. Query and delete all submissions by this user
+  try {
+    const subSnap = await getDocs(
+      query(collection(db, "form_submissions"), where("userId", "==", uid))
+    );
+    const deletePromises = subSnap.docs.map((d) => deleteDoc(d.ref));
+
+    if (email) {
+      const emailSnap = await getDocs(
+        query(collection(db, "form_submissions"), where("userEmail", "==", email))
+      );
+      emailSnap.docs.forEach((d) => {
+        if (!subSnap.docs.some((sd) => sd.id === d.id)) {
+          deletePromises.push(deleteDoc(d.ref));
+        }
+      });
+    }
+
+    if (deletePromises.length > 0) {
+      await Promise.all(deletePromises);
+    }
+  } catch (subErr) {
+    console.warn("Warning while deleting associated form_submissions:", subErr);
+  }
 }
 
 export const DEFAULT_FORM_CONFIG: FormConfig = {
