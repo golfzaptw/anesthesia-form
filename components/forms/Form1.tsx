@@ -198,6 +198,8 @@ export function Form1({
                     : "ระบุข้อเสนอแนะเพิ่มเติม (ถ้ามี)..."
                 }
                 register={register}
+                error={errors[suggKey]}
+                required={needsSuggestionNotice}
                 rows={2}
               />
             </div>
