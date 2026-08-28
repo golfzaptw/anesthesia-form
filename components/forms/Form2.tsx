@@ -394,6 +394,12 @@ export function Form2({
         </div>
       </div>
 
+      {/* Guidance message */}
+      <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-800 leading-relaxed">
+        💡 ข้อเสนอแนะของท่านมีความสำคัญอย่างยิ่ง ขอความกรุณาใช้ถ้อยคำที่สุภาพ
+        หากไม่มีข้อมูลต้องการประเมินในหัวข้อนี้ สามารถพิมพ์ &quot;-&quot; ได้เลยครับ/ค่ะ
+      </div>
+
       <EvaluatorBadge name={user?.displayName ?? ""} />
 
       {/* Live Sticky Progress Tracker */}
