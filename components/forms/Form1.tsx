@@ -18,10 +18,12 @@ export function Form1({
   userId,
   questions,
   preview,
+  batchId,
 }: {
   userId: string;
   questions: string[];
   preview?: boolean;
+  batchId?: number;
 }) {
   const router = useRouter();
   const { user } = useAuth();
@@ -79,8 +81,9 @@ export function Form1({
         userEmail: user.email ?? "",
         evaluatorName: user.displayName ?? "",
         answers: data as unknown as Record<string, unknown>,
+        batchId,
       });
-      await markFormComplete(userId, "form_1");
+      await markFormComplete(userId, "form_1", batchId);
       toast.success("ส่งแบบประเมินสำเร็จ!");
       router.replace("/hub");
     } catch {
@@ -101,7 +104,7 @@ export function Form1({
           </div>
 
           <h1 className="text-xl sm:text-2xl font-bold leading-tight">
-            แบบประเมินความพึงพอใจของนักเรียนพยาบาลวิสัญญี รุ่นที่ 42
+            แบบประเมินความพึงพอใจของนักเรียนพยาบาลวิสัญญี รุ่นที่ {batchId ?? 42}
           </h1>
           <p className="mt-1.5 text-blue-200 text-sm sm:text-base font-medium">
             ต่อหลักสูตรวิสัญญีฯ ด้านการจัดการเรียนการสอน

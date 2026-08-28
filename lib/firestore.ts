@@ -9,7 +9,6 @@ import {
   addDoc,
   deleteDoc,
   collection,
-  arrayUnion,
   updateDoc,
   serverTimestamp,
   Timestamp,
@@ -25,8 +24,10 @@ import {
   mockDeleteUser,
   mockGetFormConfig,
   mockSaveFormConfig,
+  mockCreateNewBatch,
 } from "./mockStore";
 import type {
+  BatchMeta,
   FormId,
   FormSubmission,
   StoredSubmission,
@@ -46,20 +47,33 @@ import {
 export async function getOrCreateUserDoc(
   uid: string,
   email: string,
-  displayName: string
+  displayName: string,
+  batchId?: number
 ): Promise<UserDoc> {
   const ref = doc(db, "users", uid);
   const snap = await getDoc(ref);
 
   if (snap.exists()) {
-    return snap.data() as UserDoc;
+    const existing = snap.data() as UserDoc;
+    if (batchId !== undefined) {
+      const existingBatches = existing.batches ?? (existing.batchId ? [existing.batchId] : [42]);
+      if (!existingBatches.includes(batchId)) {
+        const updatedBatches = [...existingBatches, batchId];
+        await updateDoc(ref, { batches: updatedBatches, batchId });
+      }
+    }
+    return existing;
   }
 
+  const resolvedBatch = batchId ?? 42;
   const newDoc = {
     email,
     displayName,
     createdAt: serverTimestamp(),
     completedForms: [] as FormId[],
+    completedFormsByBatch: {} as Record<string, FormId[]>,
+    batchId: resolvedBatch,
+    batches: [resolvedBatch],
   };
   await setDoc(ref, newDoc);
   return {
@@ -67,15 +81,26 @@ export async function getOrCreateUserDoc(
     displayName,
     createdAt: null as unknown as UserDoc["createdAt"],
     completedForms: [],
+    batchId: resolvedBatch,
+    batches: [resolvedBatch],
   };
 }
 
-export async function getCompletedForms(uid: string): Promise<FormId[]> {
-  if (IS_MOCK) return mockGetCompletedForms(uid);
+export async function getCompletedForms(uid: string, batchId?: number): Promise<FormId[]> {
+  if (IS_MOCK) return mockGetCompletedForms(uid, batchId);
   const ref = doc(db, "users", uid);
   const snap = await getDoc(ref);
   if (!snap.exists()) return [];
-  return (snap.data() as UserDoc).completedForms ?? [];
+  const data = snap.data();
+
+  // If batchId is provided, use the batch-aware map
+  if (batchId !== undefined) {
+    const byBatch = (data.completedFormsByBatch as Record<string, FormId[]>) ?? {};
+    return byBatch[String(batchId)] ?? [];
+  }
+
+  // Fallback: legacy completedForms field
+  return (data as UserDoc).completedForms ?? [];
 }
 
 export async function submitFormResponse(
@@ -90,11 +115,40 @@ export async function submitFormResponse(
 
 export async function markFormComplete(
   uid: string,
-  formId: FormId
+  formId: FormId,
+  batchId?: number
 ): Promise<void> {
-  if (IS_MOCK) return mockMarkFormComplete(uid, formId);
+  if (IS_MOCK) return mockMarkFormComplete(uid, formId, batchId);
   const ref = doc(db, "users", uid);
-  await updateDoc(ref, { completedForms: arrayUnion(formId) });
+  const snap = await getDoc(ref);
+  if (!snap.exists()) return;
+
+  const data = snap.data();
+  const byBatch = (data.completedFormsByBatch as Record<string, FormId[]>) ?? {};
+
+  if (batchId !== undefined) {
+    const key = String(batchId);
+    const existing = byBatch[key] ?? [];
+    if (!existing.includes(formId)) {
+      byBatch[key] = [...existing, formId];
+    }
+    const existingBatches: number[] = data.batches ?? (data.batchId ? [data.batchId] : [42]);
+    const updatedBatches = existingBatches.includes(batchId)
+      ? existingBatches
+      : [...existingBatches, batchId];
+
+    await updateDoc(ref, {
+      completedFormsByBatch: byBatch,
+      batches: updatedBatches,
+      batchId,
+    });
+  } else {
+    // Legacy: update the old completedForms array
+    const existing = (data.completedForms as FormId[]) ?? [];
+    if (!existing.includes(formId)) {
+      await updateDoc(ref, { completedForms: [...existing, formId] });
+    }
+  }
 }
 
 function toIso(value: unknown): string {
@@ -103,12 +157,12 @@ function toIso(value: unknown): string {
   return "";
 }
 
-export async function getAllSubmissions(): Promise<StoredSubmission[]> {
-  if (IS_MOCK) return mockGetAllSubmissions();
-  const snap = await getDocs(
-    query(collection(db, "form_submissions"), orderBy("submittedAt", "desc"))
-  );
-  return snap.docs.map((d) => {
+export async function getAllSubmissions(batchId?: number): Promise<StoredSubmission[]> {
+  if (IS_MOCK) return mockGetAllSubmissions(batchId);
+
+  const q = query(collection(db, "form_submissions"), orderBy("submittedAt", "desc"));
+  const snap = await getDocs(q);
+  const all: StoredSubmission[] = snap.docs.map((d) => {
     const data = d.data();
     return {
       formId: data.formId as FormId,
@@ -117,8 +171,15 @@ export async function getAllSubmissions(): Promise<StoredSubmission[]> {
       evaluatorName: (data.evaluatorName as string) ?? "",
       submittedAt: toIso(data.submittedAt),
       answers: (data.answers as Record<string, unknown>) ?? {},
+      batchId: (data.batchId as number) ?? 42,
     };
   });
+
+  if (batchId !== undefined) {
+    return all.filter((s) => (s.batchId ?? 42) === batchId);
+  }
+
+  return all;
 }
 
 export async function getAllUsers(): Promise<UserSummary[]> {
@@ -126,12 +187,16 @@ export async function getAllUsers(): Promise<UserSummary[]> {
   const snap = await getDocs(collection(db, "users"));
   return snap.docs.map((d) => {
     const data = d.data() as UserDoc;
+    const userBatch = (data as { batchId?: number }).batchId ?? (data as { batches?: number[] }).batches?.[0] ?? 42;
+    const userBatches = (data as { batches?: number[] }).batches ?? [userBatch];
     return {
       uid: d.id,
       email: data.email,
       displayName: data.displayName ?? "",
       completedForms: data.completedForms ?? [],
       createdAt: toIso(data.createdAt),
+      batchId: userBatch,
+      batches: userBatches,
     };
   });
 }
@@ -190,8 +255,15 @@ export async function getFormConfig(): Promise<FormConfig> {
     const configSnap = await getDoc(configRef);
     
     if (configSnap.exists()) {
-      const data = configSnap.data() as FormConfig;
-      return {
+      const data = configSnap.data() as Partial<FormConfig>;
+
+      // Migration: add batch fields if missing
+      const currentBatch = data.currentBatch ?? 42;
+      const batches: BatchMeta[] = data.batches ?? [
+        { id: 42, label: "รุ่นที่ 42", createdAt: new Date().toISOString(), isActive: true },
+      ];
+
+      const config: FormConfig = {
         form1Questions: data.form1Questions || FORM1_QUESTIONS,
         form2Instructors: data.form2Instructors || FORM2_INSTRUCTORS,
         form2Questions: data.form2Questions || FORM2_EVAL_QUESTIONS,
@@ -202,7 +274,20 @@ export async function getFormConfig(): Promise<FormConfig> {
         isForceClosed: Boolean(data.isForceClosed),
         startDate: data.startDate || "",
         endDate: data.endDate || "",
+        currentBatch,
+        batches,
       };
+
+      // Auto-save migration if batch fields were missing
+      if (data.currentBatch === undefined || data.batches === undefined) {
+        try {
+          await setDoc(configRef, config);
+        } catch (migrationErr) {
+          console.warn("Could not auto-migrate batch fields:", migrationErr);
+        }
+      }
+
+      return config;
     }
     
     // If no config found, initialize it
@@ -229,6 +314,54 @@ export async function saveFormConfig(config: FormConfig): Promise<void> {
     isForceClosed: Boolean(config.isForceClosed),
     startDate: config.startDate || "",
     endDate: config.endDate || "",
+    currentBatch: config.currentBatch,
+    batches: config.batches || [],
   };
   await setDoc(configRef, cleanConfig);
+}
+
+/**
+ * Create a new academic year batch.
+ * - Adds a new entry to config.batches
+ * - Sets config.currentBatch to the new batch
+ * - Resets all user completedFormsByBatch for the new batch (empty arrays)
+ * - Resets startDate/endDate
+ */
+export async function createNewBatch(
+  currentConfig: FormConfig,
+  newBatchNumber: number
+): Promise<FormConfig> {
+  if (IS_MOCK) return mockCreateNewBatch(currentConfig, newBatchNumber);
+
+  const newBatch: BatchMeta = {
+    id: newBatchNumber,
+    label: `รุ่นที่ ${newBatchNumber}`,
+    createdAt: new Date().toISOString(),
+    isActive: true,
+  };
+
+  // Mark old batches as inactive
+  const updatedBatches = currentConfig.batches.map((b) => ({
+    ...b,
+    isActive: false,
+  }));
+
+  const newConfig: FormConfig = {
+    ...currentConfig,
+    currentBatch: newBatchNumber,
+    batches: [...updatedBatches, newBatch],
+    isForceClosed: false,
+    startDate: "",
+    endDate: "",
+  };
+
+  // Save config
+  await saveFormConfig(newConfig);
+
+  // Reset completedFormsByBatch for all users
+  // The new batch key will simply not exist yet, so users won't have any completed forms
+  // We don't need to actively write empty arrays — the getCompletedForms function
+  // returns [] for missing batch keys.
+
+  return newConfig;
 }

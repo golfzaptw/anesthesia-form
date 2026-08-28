@@ -33,6 +33,10 @@ export default function Form2Page() {
         return;
       }
       setConfig(conf);
+
+      getCompletedForms(user.uid, conf.currentBatch).then((batchCompleted) => {
+        if (batchCompleted.includes("form_2")) router.replace("/hub");
+      });
     });
   }, [user, loading, router]);
 
@@ -71,7 +75,8 @@ export default function Form2Page() {
         <Form2 
           userId={user.uid} 
           instructors={config.form2Instructors} 
-          questions={config.form2Questions} 
+          questions={config.form2Questions}
+          batchId={config.currentBatch}
         />
       </main>
     </div>

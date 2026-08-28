@@ -33,6 +33,10 @@ export default function Form3Page() {
         return;
       }
       setConfig(conf);
+
+      getCompletedForms(user.uid, conf.currentBatch).then((batchCompleted) => {
+        if (batchCompleted.includes("form_3")) router.replace("/hub");
+      });
     });
   }, [user, loading, router]);
 
@@ -68,7 +72,7 @@ export default function Form3Page() {
       </header>
 
       <main className="max-w-2xl mx-auto px-4 pt-6">
-        <Form3 userId={user.uid} departments={config.form3Departments} />
+        <Form3 userId={user.uid} departments={config.form3Departments} batchId={config.currentBatch} />
       </main>
     </div>
   );

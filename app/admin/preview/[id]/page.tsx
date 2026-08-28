@@ -53,13 +53,13 @@ export default function AdminPreviewPage({ params }: { params: { id: string } })
         </div>
         
         {params.id === "1" && (
-          <Form1 userId="preview-user" questions={config.form1Questions} preview={true} />
+          <Form1 userId="preview-user" questions={config.form1Questions} preview={true} batchId={config.currentBatch} />
         )}
         {params.id === "2" && (
-          <Form2 userId="preview-user" instructors={config.form2Instructors} questions={config.form2Questions} preview={true} />
+          <Form2 userId="preview-user" instructors={config.form2Instructors} questions={config.form2Questions} preview={true} batchId={config.currentBatch} />
         )}
         {params.id === "3" && (
-          <Form3 userId="preview-user" departments={config.form3Departments} preview={true} />
+          <Form3 userId="preview-user" departments={config.form3Departments} preview={true} batchId={config.currentBatch} />
         )}
         
         {!["1", "2", "3"].includes(params.id) && (

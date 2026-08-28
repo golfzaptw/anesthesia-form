@@ -1,4 +1,4 @@
-import type { AppUser, FormId, FormSubmission, StoredSubmission, UserSummary } from "@/types";
+import type { AppUser, BatchMeta, FormId, FormSubmission, StoredSubmission, UserSummary } from "@/types";
 import { DEFAULT_FORM_CONFIG, type FormConfig } from "@/lib/formData";
 
 const USERS_KEY = "mock_users";
@@ -12,6 +12,9 @@ interface MockUserRecord {
   displayName: string;
   password: string;
   completedForms: FormId[];
+  completedFormsByBatch: Record<string, FormId[]>;
+  batchId?: number;
+  batches?: number[];
   createdAt: string;
 }
 
@@ -60,6 +63,8 @@ export async function mockSignUp(
   displayName: string
 ): Promise<void> {
   await delay();
+  const config = await mockGetFormConfig();
+  const currentBatch = config.currentBatch ?? 42;
   const users = getUsers();
   if (users.some((u) => u.email === email)) {
     throw new Error("auth/email-already-in-use");
@@ -70,6 +75,9 @@ export async function mockSignUp(
     displayName,
     password,
     completedForms: [],
+    completedFormsByBatch: {},
+    batchId: currentBatch,
+    batches: [currentBatch],
     createdAt: new Date().toISOString(),
   };
   write(USERS_KEY, [...users, record]);
@@ -105,11 +113,16 @@ export async function mockSignOut(): Promise<void> {
 
 export async function mockRegisterGuest(displayName: string): Promise<string> {
   await delay();
+  const config = await mockGetFormConfig();
+  const currentBatch = config.currentBatch ?? 42;
   const users = getUsers();
   const trimmed = displayName.trim();
 
-  // Check if active user already exists with this name
-  if (users.some((u) => u.displayName.toLowerCase() === trimmed.toLowerCase())) {
+  // Check if active user already exists with this name IN THE CURRENT BATCH
+  if (users.some((u) => {
+    const uBatches = u.batches ?? [u.batchId ?? 42];
+    return uBatches.includes(currentBatch) && u.displayName.toLowerCase() === trimmed.toLowerCase();
+  })) {
     throw new Error("auth/display-name-already-in-use");
   }
 
@@ -120,6 +133,9 @@ export async function mockRegisterGuest(displayName: string): Promise<string> {
     displayName: trimmed,
     password: generatedPassword,
     completedForms: [],
+    completedFormsByBatch: {},
+    batchId: currentBatch,
+    batches: [currentBatch],
     createdAt: new Date().toISOString(),
   };
   write(USERS_KEY, [...users, record]);
@@ -153,17 +169,39 @@ export async function mockLoginGuest(displayName: string, password: string): Pro
   notify(session);
 }
 
-export async function mockGetCompletedForms(uid: string): Promise<FormId[]> {
+export async function mockGetCompletedForms(uid: string, batchId?: number): Promise<FormId[]> {
   await delay();
-  return getUsers().find((u) => u.uid === uid)?.completedForms ?? [];
+  const user = getUsers().find((u) => u.uid === uid);
+  if (!user) return [];
+
+  if (batchId !== undefined) {
+    const byBatch = user.completedFormsByBatch ?? {};
+    return byBatch[String(batchId)] ?? [];
+  }
+
+  return user.completedForms ?? [];
 }
 
-export async function mockMarkFormComplete(uid: string, formId: FormId): Promise<void> {
-  const users = getUsers().map((u) =>
-    u.uid === uid && !u.completedForms.includes(formId)
-      ? { ...u, completedForms: [...u.completedForms, formId] }
-      : u
-  );
+export async function mockMarkFormComplete(uid: string, formId: FormId, batchId?: number): Promise<void> {
+  const users = getUsers().map((u) => {
+    if (u.uid !== uid) return u;
+
+    if (batchId !== undefined) {
+      const byBatch = u.completedFormsByBatch ?? {};
+      const key = String(batchId);
+      const existing = byBatch[key] ?? [];
+      if (!existing.includes(formId)) {
+        byBatch[key] = [...existing, formId];
+      }
+      return { ...u, completedFormsByBatch: byBatch };
+    }
+
+    // Legacy
+    if (!u.completedForms.includes(formId)) {
+      return { ...u, completedForms: [...u.completedForms, formId] };
+    }
+    return u;
+  });
   write(USERS_KEY, users);
 }
 
@@ -178,20 +216,36 @@ export async function mockSubmitFormResponse(
   ]);
 }
 
-export async function mockGetAllSubmissions(): Promise<StoredSubmission[]> {
+export async function mockGetAllSubmissions(batchId?: number): Promise<StoredSubmission[]> {
   await delay();
-  return read<StoredSubmission[]>(SUBMISSIONS_KEY, []);
+  const all = read<StoredSubmission[]>(SUBMISSIONS_KEY, []);
+
+  if (batchId !== undefined) {
+    return all.filter((s) => {
+      // Submissions without batchId are assumed to be batch 42 (legacy)
+      const subBatch = s.batchId ?? 42;
+      return subBatch === batchId;
+    });
+  }
+
+  return all;
 }
 
 export async function mockGetAllUsers(): Promise<UserSummary[]> {
   await delay();
-  return getUsers().map((u) => ({
-    uid: u.uid,
-    email: u.email,
-    displayName: u.displayName,
-    completedForms: u.completedForms,
-    createdAt: u.createdAt,
-  }));
+  return getUsers().map((u) => {
+    const userBatch = u.batchId ?? u.batches?.[0] ?? 42;
+    const userBatches = u.batches ?? [userBatch];
+    return {
+      uid: u.uid,
+      email: u.email,
+      displayName: u.displayName,
+      completedForms: u.completedForms,
+      createdAt: u.createdAt,
+      batchId: userBatch,
+      batches: userBatches,
+    };
+  });
 }
 
 export async function mockDeleteUser(uid: string, email?: string): Promise<void> {
@@ -207,12 +261,51 @@ export async function mockDeleteUser(uid: string, email?: string): Promise<void>
 
 export async function mockGetFormConfig(): Promise<FormConfig> {
   await delay();
-  return read<FormConfig>(CONFIG_KEY, DEFAULT_FORM_CONFIG);
+  const config = read<Partial<FormConfig>>(CONFIG_KEY, {});
+
+  // Migration: ensure batch fields exist
+  return {
+    ...DEFAULT_FORM_CONFIG,
+    ...config,
+    currentBatch: config.currentBatch ?? DEFAULT_FORM_CONFIG.currentBatch,
+    batches: config.batches ?? DEFAULT_FORM_CONFIG.batches,
+  };
 }
 
 export async function mockSaveFormConfig(config: FormConfig): Promise<void> {
   await delay();
   write(CONFIG_KEY, config);
+}
+
+export async function mockCreateNewBatch(
+  currentConfig: FormConfig,
+  newBatchNumber: number
+): Promise<FormConfig> {
+  await delay();
+
+  const newBatch: BatchMeta = {
+    id: newBatchNumber,
+    label: `รุ่นที่ ${newBatchNumber}`,
+    createdAt: new Date().toISOString(),
+    isActive: true,
+  };
+
+  const updatedBatches = currentConfig.batches.map((b) => ({
+    ...b,
+    isActive: false,
+  }));
+
+  const newConfig: FormConfig = {
+    ...currentConfig,
+    currentBatch: newBatchNumber,
+    batches: [...updatedBatches, newBatch],
+    isForceClosed: false,
+    startDate: "",
+    endDate: "",
+  };
+
+  write(CONFIG_KEY, newConfig);
+  return newConfig;
 }
 
 /** Clears all mock data — handy for re-testing a form from scratch. */

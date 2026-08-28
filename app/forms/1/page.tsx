@@ -34,6 +34,11 @@ export default function Form1Page() {
         return;
       }
       setConfig(conf);
+
+      // Re-check with batch-aware completedForms
+      getCompletedForms(user.uid, conf.currentBatch).then((batchCompleted) => {
+        if (batchCompleted.includes("form_1")) router.replace("/hub");
+      });
     });
   }, [user, loading, router]);
 
@@ -69,7 +74,7 @@ export default function Form1Page() {
       </header>
 
       <main className="max-w-2xl mx-auto px-4 pt-6">
-        <Form1 userId={user.uid} questions={config.form1Questions} />
+        <Form1 userId={user.uid} questions={config.form1Questions} batchId={config.currentBatch} />
       </main>
     </div>
   );

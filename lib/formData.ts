@@ -1,28 +1,30 @@
-import type { FormCardMeta } from "@/types";
+import type { BatchMeta, FormCardMeta } from "@/types";
 
-export const FORMS_META: FormCardMeta[] = [
-  {
-    id: "form_1",
-    title: "แบบประเมินด้านการจัดการเรียนการสอน",
-    description:
-      "ประเมินความพึงพอใจต่อหลักสูตรวิสัญญีฯ รุ่นที่ 42 ด้านการจัดการเรียนการสอน ครอบคลุม 10 ด้าน",
-    href: "/forms/1",
-  },
-  {
-    id: "form_2",
-    title: "แบบประเมินอาจารย์วิสัญญีแพทย์",
-    description:
-      "ประเมินความพึงพอใจต่ออาจารย์วิสัญญีแพทย์ รุ่นที่ 42 จำนวน 16 ท่าน",
-    href: "/forms/2",
-  },
-  {
-    id: "form_3",
-    title: "แบบประเมินพยาบาลวิสัญญี",
-    description:
-      "ประเมินความพึงพอใจต่อบุคลากรระดับพยาบาลวิสัญญี รุ่นที่ 42 แยกตามแผนก",
-    href: "/forms/3",
-  },
-];
+export function getFormsMeta(batch: number): FormCardMeta[] {
+  return [
+    {
+      id: "form_1",
+      title: "แบบประเมินด้านการจัดการเรียนการสอน",
+      description: `ประเมินความพึงพอใจต่อหลักสูตรวิสัญญีฯ รุ่นที่ ${batch} ด้านการจัดการเรียนการสอน ครอบคลุม 10 ด้าน`,
+      href: "/forms/1",
+    },
+    {
+      id: "form_2",
+      title: "แบบประเมินอาจารย์วิสัญญีแพทย์",
+      description: `ประเมินความพึงพอใจต่ออาจารย์วิสัญญีแพทย์ รุ่นที่ ${batch}`,
+      href: "/forms/2",
+    },
+    {
+      id: "form_3",
+      title: "แบบประเมินพยาบาลวิสัญญี",
+      description: `ประเมินความพึงพอใจต่อบุคลากรระดับพยาบาลวิสัญญี รุ่นที่ ${batch} แยกตามแผนก`,
+      href: "/forms/3",
+    },
+  ];
+}
+
+/** @deprecated Use getFormsMeta(batch) instead. Kept for backward compat. */
+export const FORMS_META: FormCardMeta[] = getFormsMeta(42);
 
 export const FORM1_QUESTIONS = [
   "กำหนดวัตถุประสงค์แต่ละบทเรียนชัดเจนดี",
@@ -91,6 +93,8 @@ export interface FormConfig {
   isForceClosed?: boolean;
   startDate?: string;
   endDate?: string;
+  currentBatch: number;
+  batches: BatchMeta[];
 }
 
 export const FORM3_DEPARTMENTS: DepartmentData[] = [
@@ -248,4 +252,13 @@ export const DEFAULT_FORM_CONFIG: FormConfig = {
   isForceClosed: false,
   startDate: "",
   endDate: "",
+  currentBatch: 42,
+  batches: [
+    {
+      id: 42,
+      label: "รุ่นที่ 42",
+      createdAt: new Date().toISOString(),
+      isActive: true,
+    },
+  ],
 };

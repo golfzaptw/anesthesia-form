@@ -22,7 +22,7 @@ import {
   serverTimestamp,
 } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
-import { getOrCreateUserDoc, nameToSlug } from "@/lib/firestore";
+import { getOrCreateUserDoc, nameToSlug, getFormConfig } from "@/lib/firestore";
 import { IS_MOCK } from "@/lib/mockMode";
 import {
   mockOnAuthStateChanged,
@@ -73,29 +73,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signUp = async (email: string, password: string, displayName: string) => {
     if (IS_MOCK) return mockSignUp(email, password, displayName);
+    const conf = await getFormConfig();
+    const currentBatch = conf.currentBatch ?? 42;
     const { user: newUser } = await createUserWithEmailAndPassword(auth, email, password);
     await updateProfile(newUser, { displayName });
-    await getOrCreateUserDoc(newUser.uid, email, displayName);
+    await getOrCreateUserDoc(newUser.uid, email, displayName, currentBatch);
     setUser({ uid: newUser.uid, email, displayName });
   };
 
   const signIn = async (email: string, password: string) => {
     if (IS_MOCK) return mockSignIn(email, password);
     const { user: existingUser } = await signInWithEmailAndPassword(auth, email, password);
+    const conf = await getFormConfig();
+    const currentBatch = conf.currentBatch ?? 42;
     await getOrCreateUserDoc(
       existingUser.uid,
       existingUser.email ?? "",
-      existingUser.displayName ?? ""
+      existingUser.displayName ?? "",
+      currentBatch
     );
   };
 
   const registerAsGuest = async (displayName: string) => {
     if (IS_MOCK) return mockRegisterGuest(displayName);
+    const conf = await getFormConfig();
+    const currentBatch = conf.currentBatch ?? 42;
     const trimmedName = displayName.trim();
     const slug = nameToSlug(trimmedName);
+    const batchSlug = currentBatch === 42 ? slug : `${currentBatch}_${slug}`;
 
     // 1. Direct check on evaluator_names document
-    const nameRef = doc(db, "evaluator_names", slug);
+    const nameRef = doc(db, "evaluator_names", batchSlug);
     const nameSnap = await getDoc(nameRef);
     if (nameSnap.exists()) {
       throw new Error("auth/display-name-already-in-use");
@@ -116,6 +124,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           uid: guestUser.uid,
           email: uniqueEmail,
           displayName: trimmedName,
+          batchId: currentBatch,
           createdAt: serverTimestamp(),
         }),
         setDoc(doc(db, "users", guestUser.uid), {
@@ -123,6 +132,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           displayName: trimmedName,
           createdAt: serverTimestamp(),
           completedForms: [] as FormId[],
+          completedFormsByBatch: {} as Record<string, FormId[]>,
+          batchId: currentBatch,
+          batches: [currentBatch],
         }),
       ]);
 
@@ -139,12 +151,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const loginAsGuest = async (displayName: string, password: string) => {
     if (IS_MOCK) return mockLoginGuest(displayName, password);
+    const conf = await getFormConfig();
+    const currentBatch = conf.currentBatch ?? 42;
     const trimmedName = displayName.trim();
     const trimmedPass = password.trim();
     const slug = nameToSlug(trimmedName);
+    const batchSlug = currentBatch === 42 ? slug : `${currentBatch}_${slug}`;
 
-    const nameRef = doc(db, "evaluator_names", slug);
-    const nameSnap = await getDoc(nameRef);
+    let nameRef = doc(db, "evaluator_names", batchSlug);
+    let nameSnap = await getDoc(nameRef);
+    if (!nameSnap.exists() && currentBatch !== 42) {
+      nameRef = doc(db, "evaluator_names", slug);
+      nameSnap = await getDoc(nameRef);
+    }
 
     let targetEmail: string;
     if (nameSnap.exists()) {

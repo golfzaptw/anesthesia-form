@@ -252,11 +252,13 @@ export function Form2({
   instructors,
   questions,
   preview,
+  batchId,
 }: {
   userId: string;
   instructors: string[];
   questions: string[];
   preview?: boolean;
+  batchId?: number;
 }) {
   const router = useRouter();
   const { user } = useAuth();
@@ -334,8 +336,9 @@ export function Form2({
         userEmail: user.email ?? "",
         evaluatorName: user.displayName ?? "",
         answers: data,
+        batchId,
       });
-      await markFormComplete(userId, "form_2");
+      await markFormComplete(userId, "form_2", batchId);
       toast.success("ส่งแบบประเมินสำเร็จ!");
       router.replace("/hub");
     } catch {
@@ -379,7 +382,7 @@ export function Form2({
           </div>
 
           <h1 className="text-xl sm:text-2xl font-bold leading-tight">
-            แบบประเมินความพึงพอใจของนักเรียนพยาบาลวิสัญญี รุ่นที่ 42
+            แบบประเมินความพึงพอใจของนักเรียนพยาบาลวิสัญญี รุ่นที่ {batchId ?? 42}
           </h1>
           <p className="mt-1.5 text-purple-200 text-sm sm:text-base font-medium">
             ต่อบุคลากรระดับอาจารย์วิสัญญีแพทย์ (จำนวน {instructors.length} ท่าน)

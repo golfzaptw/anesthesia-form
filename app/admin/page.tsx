@@ -4,9 +4,9 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
-import { getAllSubmissions, getAllUsers, getFormConfig, deleteUser, saveFormConfig } from "@/lib/firestore";
+import { getAllSubmissions, getAllUsers, getFormConfig, deleteUser, saveFormConfig, createNewBatch } from "@/lib/firestore";
 import { isAdmin, HAS_ADMINS } from "@/lib/admin";
-import { FORMS_META, type FormConfig } from "@/lib/formData";
+import { getFormsMeta, type FormConfig } from "@/lib/formData";
 import {
   analyseForm1,
   analyseForm2,
@@ -33,6 +33,9 @@ import {
   Unlock,
   Clock,
   Sliders,
+  ChevronDown,
+  Plus,
+  Layers,
 } from "lucide-react";
 import type { FormId, StoredSubmission, UserSummary } from "@/types";
 import toast from "react-hot-toast";
@@ -52,7 +55,18 @@ export default function AdminPage() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [now, setNow] = useState(Date.now());
 
+  // Batch state
+  const [selectedBatch, setSelectedBatch] = useState<number | null>(null);
+  const [showBatchDropdown, setShowBatchDropdown] = useState(false);
+  const [showNewBatchModal, setShowNewBatchModal] = useState(false);
+  const [isCreatingBatch, setIsCreatingBatch] = useState(false);
+
   const allowed = !HAS_ADMINS || isAdmin(user?.email);
+
+  const activeBatch = selectedBatch ?? config?.currentBatch ?? 42;
+  const isViewingCurrentBatch = activeBatch === config?.currentBatch;
+
+  const formsMeta = useMemo(() => getFormsMeta(activeBatch), [activeBatch]);
 
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 1000);
@@ -65,14 +79,27 @@ export default function AdminPage() {
 
   useEffect(() => {
     if (!user || !allowed) return;
-    Promise.all([getAllSubmissions(), getAllUsers(), getFormConfig()])
-      .then(([subs, us, conf]) => {
+    getFormConfig()
+      .then((conf) => {
+        setConfig(conf);
+        setSelectedBatch(conf.currentBatch);
+        return Promise.all([
+          getAllSubmissions(conf.currentBatch),
+          getAllUsers(),
+        ]);
+      })
+      .then(([subs, us]) => {
         setSubmissions(subs);
         setUsers(us.filter((u) => !isAdmin(u.email)));
-        setConfig(conf);
       })
       .finally(() => setFetching(false));
   }, [user, allowed]);
+
+  // Re-fetch submissions when batch selection changes
+  useEffect(() => {
+    if (!user || !allowed || selectedBatch === null || fetching) return;
+    getAllSubmissions(selectedBatch).then(setSubmissions);
+  }, [selectedBatch, user, allowed, fetching]);
 
   const byForm = useMemo(
     () => ({
@@ -126,6 +153,49 @@ export default function AdminPage() {
     };
   }, [config, now]);
 
+  // Filter users by activeBatch:
+  // A user belongs to the active batch if they submitted a form in this batch,
+  // OR if their registered batches includes the active batch.
+  const batchUsers = useMemo(() => {
+    return users.filter((u) => {
+      // 1. Did the user submit anything in this batch?
+      const hasSubmittedInBatch = submissions.some(
+        (s) => s.userId === u.uid || (u.email && s.userEmail === u.email)
+      );
+      if (hasSubmittedInBatch) return true;
+
+      // 2. Was the user registered in this batch?
+      const userBatches = u.batches ?? (u.batchId ? [u.batchId] : [42]);
+      return userBatches.includes(activeBatch);
+    });
+  }, [users, submissions, activeBatch]);
+
+  const totalPossible = batchUsers.length * formsMeta.length;
+  const completionRate = totalPossible
+    ? Math.round((submissions.length / totalPossible) * 100)
+    : 0;
+  const form1Avg = overallAverage(form1.scores);
+
+  // Auto-switch to overview if switching to a past batch while in editor tab
+  useEffect(() => {
+    if (!isViewingCurrentBatch && tab === "editor") {
+      setTab("overview");
+    }
+  }, [isViewingCurrentBatch, tab]);
+
+  const TABS: { id: Tab; label: string }[] = useMemo(() => {
+    const base: { id: Tab; label: string }[] = [
+      { id: "overview", label: "ภาพรวม" },
+      { id: "form_1", label: "การเรียนการสอน" },
+      { id: "form_2", label: "อาจารย์แพทย์" },
+      { id: "form_3", label: "พยาบาลวิสัญญี" },
+    ];
+    if (isViewingCurrentBatch) {
+      base.push({ id: "editor", label: "ตั้งค่าแบบประเมิน" });
+    }
+    return base;
+  }, [isViewingCurrentBatch]);
+
   if (loading || (user && allowed && fetching)) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -171,16 +241,31 @@ export default function AdminPage() {
     }
   };
 
-  const totalPossible = users.length * FORMS_META.length;
-  const completionRate = totalPossible
-    ? Math.round((submissions.length / totalPossible) * 100)
-    : 0;
-  const form1Avg = overallAverage(form1.scores);
+  const handleCreateNewBatch = async () => {
+    if (!config) return;
+    const nextBatch = config.currentBatch + 1;
+    setIsCreatingBatch(true);
+    try {
+      const newConfig = await createNewBatch(config, nextBatch);
+      setConfig(newConfig);
+      setSelectedBatch(nextBatch);
+      // Re-fetch submissions for the new batch (will be empty)
+      const subs = await getAllSubmissions(nextBatch);
+      setSubmissions(subs);
+      toast.success(`🎉 สร้างรุ่นที่ ${nextBatch} สำเร็จ!`);
+      setShowNewBatchModal(false);
+    } catch (err) {
+      console.error("Failed to create new batch:", err);
+      toast.error("เกิดข้อผิดพลาดในการสร้างรุ่นใหม่");
+    } finally {
+      setIsCreatingBatch(false);
+    }
+  };
 
   const handleExport = (formId: FormId) => {
     const subs = byForm[formId];
     if (!subs.length) return;
-    downloadCsv(`${formId}_submissions.csv`, submissionsToCsv(subs));
+    downloadCsv(`${formId}_batch${activeBatch}_submissions.csv`, submissionsToCsv(subs));
   };
 
   const handleDeleteUser = async () => {
@@ -211,14 +296,6 @@ export default function AdminPage() {
     }
   };
 
-  const TABS: { id: Tab; label: string }[] = [
-    { id: "overview", label: "ภาพรวม" },
-    { id: "form_1", label: "การเรียนการสอน" },
-    { id: "form_2", label: "อาจารย์แพทย์" },
-    { id: "form_3", label: "พยาบาลวิสัญญี" },
-    { id: "editor", label: "ตั้งค่าแบบประเมิน" },
-  ];
-
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
@@ -244,8 +321,103 @@ export default function AdminPage() {
       </header>
 
       <main className="max-w-4xl mx-auto px-4 py-6">
+        {/* Batch Selector */}
+        {config && config.batches.length > 0 && (
+          <div className="mb-4 flex items-center justify-between">
+            <div className="relative">
+              <button
+                onClick={() => setShowBatchDropdown(!showBatchDropdown)}
+                className="flex items-center gap-2 bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-gray-800 hover:border-blue-300 hover:bg-blue-50/30 transition-all shadow-sm"
+              >
+                <Layers className="w-4 h-4 text-blue-600" />
+                <span>
+                  {config.batches.find((b) => b.id === activeBatch)?.label ?? `รุ่นที่ ${activeBatch}`}
+                </span>
+                {isViewingCurrentBatch && (
+                  <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-700 border border-emerald-200">
+                    ปัจจุบัน
+                  </span>
+                )}
+                <ChevronDown className="w-4 h-4 text-gray-400" />
+              </button>
+
+              {showBatchDropdown && (
+                <>
+                  <div className="fixed inset-0 z-20" onClick={() => setShowBatchDropdown(false)} />
+                  <div className="absolute left-0 top-full mt-1 z-30 bg-white rounded-xl border border-gray-200 shadow-lg min-w-[200px] py-1 animate-in fade-in zoom-in-95 duration-150">
+                    {[...config.batches].reverse().map((b) => (
+                      <button
+                        key={b.id}
+                        onClick={() => {
+                          setSelectedBatch(b.id);
+                          setShowBatchDropdown(false);
+                        }}
+                        className={`w-full text-left px-4 py-2.5 text-sm flex items-center justify-between gap-3 hover:bg-blue-50 transition-colors ${
+                          b.id === activeBatch ? "bg-blue-50 text-blue-700 font-semibold" : "text-gray-700"
+                        }`}
+                      >
+                        <span>{b.label}</span>
+                        <div className="flex items-center gap-1.5">
+                          {b.id === config.currentBatch && (
+                            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-700 border border-emerald-200">
+                              ปัจจุบัน
+                            </span>
+                          )}
+                          {b.id === activeBatch && (
+                            <span className="w-2 h-2 rounded-full bg-blue-600" />
+                          )}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+
+            <button
+              onClick={() => setShowNewBatchModal(true)}
+              className="flex items-center gap-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-4 py-2.5 rounded-xl text-sm font-semibold shadow-sm shadow-blue-500/20 transition-all"
+            >
+              <Plus className="w-4 h-4" />
+              สร้างรุ่นใหม่
+            </button>
+          </div>
+        )}
+
+        {/* Viewing past batch notice */}
+        {!isViewingCurrentBatch && config && (
+          <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50/80 p-4 shadow-sm">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-start gap-3">
+                <div className="p-2 bg-amber-100 text-amber-800 rounded-xl shrink-0 mt-0.5">
+                  <Lock className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold uppercase tracking-wider text-amber-900">
+                      ข้อมูลย้อนหลัง (โหมดดูอย่างเดียว)
+                    </span>
+                    <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-amber-200/80 text-amber-900 border border-amber-300">
+                      {config.batches.find((b) => b.id === activeBatch)?.label ?? `รุ่นที่ ${activeBatch}`}
+                    </span>
+                  </div>
+                  <p className="text-xs text-amber-800 mt-1 leading-relaxed">
+                    รุ่นนี้ปิดรับคำตอบแล้ว สามารถดูผลคะแนน สถิติ ข้อเสนอแนะ และดาวน์โหลดรายงาน CSV ได้อย่างเดียว (ไม่สามารถแก้ไขข้อมูลได้)
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setSelectedBatch(config.currentBatch)}
+                className="text-xs font-semibold text-amber-900 hover:text-white hover:bg-amber-700 bg-amber-200/70 px-3.5 py-2 rounded-xl transition-all border border-amber-300 shrink-0 self-start sm:self-center"
+              >
+                กลับไปรุ่นปัจจุบัน (รุ่นที่ {config.currentBatch})
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Assessment Status & Quick Lock Control Card */}
-        {config && (
+        {config && isViewingCurrentBatch && (
           <div className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-5 mb-6 shadow-sm">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div className="flex items-start gap-3.5">
@@ -331,7 +503,7 @@ export default function AdminPage() {
 
         {/* Summary stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-          <StatCard icon={Users} label="ผู้ลงทะเบียน" value={users.length} tone="blue" />
+          <StatCard icon={Users} label="ผู้ลงทะเบียน" value={batchUsers.length} tone="blue" />
           <StatCard
             icon={FileCheck2}
             label="แบบประเมินที่ส่งแล้ว"
@@ -375,7 +547,7 @@ export default function AdminPage() {
         {tab === "overview" && (
           <div className="space-y-4">
             <div className="grid sm:grid-cols-3 gap-3">
-              {FORMS_META.map((f) => (
+              {formsMeta.map((f) => (
                 <div key={f.id} className="bg-white rounded-xl border border-gray-200 p-4">
                   <p className="text-xs text-gray-500 leading-snug">{f.title}</p>
                   <p className="text-2xl font-bold text-gray-800 mt-2">
@@ -396,12 +568,12 @@ export default function AdminPage() {
             <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
               <div className="px-4 py-3 border-b border-gray-100">
                 <h2 className="font-semibold text-sm text-gray-800">
-                  สถานะรายบุคคล ({users.length})
+                  สถานะรายบุคคล ({batchUsers.length})
                 </h2>
               </div>
-              {users.length === 0 ? (
+              {batchUsers.length === 0 ? (
                 <p className="text-sm text-gray-400 px-4 py-6 text-center">
-                  ยังไม่มีผู้ลงทะเบียน
+                  ยังไม่มีผู้ลงทะเบียนในรุ่นนี้
                 </p>
               ) : (
                 <div className="overflow-x-auto">
@@ -412,34 +584,43 @@ export default function AdminPage() {
                         <th className="text-center font-medium px-2 py-2">ชุด 1</th>
                         <th className="text-center font-medium px-2 py-2">ชุด 2</th>
                         <th className="text-center font-medium px-2 py-2">ชุด 3</th>
-                        <th className="text-center font-medium px-2 py-2 w-20">จัดการ</th>
+                        {isViewingCurrentBatch && (
+                          <th className="text-center font-medium px-2 py-2 w-20">จัดการ</th>
+                        )}
                       </tr>
                     </thead>
                     <tbody>
-                      {users.map((u) => (
+                      {batchUsers.map((u) => (
                         <tr key={u.uid} className="border-t border-gray-100">
                           <td className="px-4 py-2">
                             <p className="text-gray-800">{u.displayName || "—"}</p>
                             <p className="text-xs text-gray-400">{u.email}</p>
                           </td>
-                          {FORMS_META.map((f) => (
-                            <td key={f.id} className="text-center px-2 py-2">
-                              {u.completedForms.includes(f.id) ? (
-                                <span className="text-green-600">✓</span>
-                              ) : (
-                                <span className="text-gray-300">—</span>
-                              )}
+                          {formsMeta.map((f) => {
+                            const isCompleted = byForm[f.id].some(
+                              (s) => s.userId === u.uid || (u.email && s.userEmail === u.email)
+                            );
+                            return (
+                              <td key={f.id} className="text-center px-2 py-2">
+                                {isCompleted ? (
+                                  <span className="text-green-600 font-bold">✓</span>
+                                ) : (
+                                  <span className="text-gray-300">—</span>
+                                )}
+                              </td>
+                            );
+                          })}
+                          {isViewingCurrentBatch && (
+                            <td className="text-center px-2 py-2">
+                              <button
+                                onClick={() => setUserToDelete(u)}
+                                title="ลบผู้เข้าร่วมประเมิน"
+                                className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors inline-flex items-center justify-center"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
                             </td>
-                          ))}
-                          <td className="text-center px-2 py-2">
-                            <button
-                              onClick={() => setUserToDelete(u)}
-                              title="ลบผู้เข้าร่วมประเมิน"
-                              className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors inline-flex items-center justify-center"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </td>
+                          )}
                         </tr>
                       ))}
                     </tbody>
@@ -623,7 +804,7 @@ export default function AdminPage() {
                 <div className="mt-2 pt-2 border-t border-gray-200/60 flex items-center justify-between text-xs text-gray-600">
                   <span>ส่งแบบประเมินแล้ว:</span>
                   <span className="font-semibold text-blue-600">
-                    {userToDelete.completedForms.length} / 3 ชุด
+                    {submissions.filter((s) => s.userId === userToDelete.uid || (userToDelete.email && s.userEmail === userToDelete.email)).length} / 3 ชุด
                   </span>
                 </div>
               </div>
@@ -656,6 +837,87 @@ export default function AdminPage() {
                     <>
                       <Trash2 className="w-4 h-4" />
                       ยืนยันการลบ
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Create New Batch Modal */}
+        {showNewBatchModal && config && (
+          <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl border border-gray-100 animate-in fade-in zoom-in-95 duration-150">
+              <div className="flex items-center gap-3 text-blue-600 mb-4">
+                <div className="p-2.5 bg-blue-50 rounded-xl">
+                  <Layers className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-gray-900">
+                    สร้างรุ่นใหม่
+                  </h3>
+                  <p className="text-xs text-gray-500">เริ่มต้นปีการศึกษาใหม่</p>
+                </div>
+              </div>
+
+              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-4 border border-blue-100 mb-4">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-sm text-gray-600">รุ่นปัจจุบัน:</span>
+                  <span className="font-bold text-gray-800">รุ่นที่ {config.currentBatch}</span>
+                </div>
+                <div className="flex items-center justify-center">
+                  <div className="w-8 h-8 flex items-center justify-center text-gray-400">→</div>
+                </div>
+                <div className="flex items-center justify-between mt-1">
+                  <span className="text-sm text-gray-600">รุ่นใหม่:</span>
+                  <span className="font-bold text-blue-700 text-lg">รุ่นที่ {config.currentBatch + 1}</span>
+                </div>
+              </div>
+
+              <div className="space-y-2 mb-6">
+                <div className="flex items-start gap-2 text-sm text-gray-700">
+                  <span className="text-emerald-600 mt-0.5">✅</span>
+                  <span>นักเรียนทุกคนจะสามารถทำแบบประเมินรุ่นใหม่ได้</span>
+                </div>
+                <div className="flex items-start gap-2 text-sm text-gray-700">
+                  <span className="text-emerald-600 mt-0.5">✅</span>
+                  <span>ข้อมูลรุ่นเก่ายังคงเก็บไว้ดูย้อนหลังได้</span>
+                </div>
+                <div className="flex items-start gap-2 text-sm text-gray-700">
+                  <span className="text-emerald-600 mt-0.5">✅</span>
+                  <span>ตั้งค่าแบบประเมิน (คำถาม, อาจารย์, แผนก) จะคงเดิม สามารถแก้ไขได้ภายหลัง</span>
+                </div>
+                <div className="flex items-start gap-2 text-sm text-gray-700">
+                  <span className="text-blue-600 mt-0.5">🔄</span>
+                  <span>กำหนดเวลาเปิด-ปิดจะถูก reset (ต้องตั้งค่าใหม่)</span>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2.5">
+                <button
+                  type="button"
+                  disabled={isCreatingBatch}
+                  onClick={() => setShowNewBatchModal(false)}
+                  className="px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50"
+                >
+                  ยกเลิก
+                </button>
+                <button
+                  type="button"
+                  disabled={isCreatingBatch}
+                  onClick={handleCreateNewBatch}
+                  className="px-4 py-2 text-sm font-medium bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-lg transition-all flex items-center gap-1.5 disabled:opacity-50 shadow-sm"
+                >
+                  {isCreatingBatch ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      กำลังสร้าง...
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="w-4 h-4" />
+                      สร้างรุ่นที่ {config.currentBatch + 1}
                     </>
                   )}
                 </button>

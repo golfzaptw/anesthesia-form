@@ -275,10 +275,12 @@ export function Form3({
   userId,
   departments,
   preview,
+  batchId,
 }: {
   userId: string;
   departments: DepartmentData[];
   preview?: boolean;
+  batchId?: number;
 }) {
   const router = useRouter();
   const { user } = useAuth();
@@ -347,8 +349,9 @@ export function Form3({
         userEmail: user.email ?? "",
         evaluatorName: user.displayName ?? "",
         answers: data,
+        batchId,
       });
-      await markFormComplete(userId, "form_3");
+      await markFormComplete(userId, "form_3", batchId);
       toast.success("ส่งแบบประเมินสำเร็จ!");
       router.replace("/hub");
     } catch {
@@ -387,7 +390,7 @@ export function Form3({
           </div>
 
           <h1 className="text-xl sm:text-2xl font-bold leading-tight">
-            แบบประเมินความพึงพอใจของนักเรียนพยาบาลวิสัญญี รุ่นที่ 42
+            แบบประเมินความพึงพอใจของนักเรียนพยาบาลวิสัญญี รุ่นที่ {batchId ?? 42}
           </h1>
           <p className="mt-1.5 text-teal-200 text-sm sm:text-base font-medium">
             ต่อบุคลากรระดับพยาบาลวิสัญญี (แยกตาม {departments.length} แผนก • รวม {totalStaffCount} ท่าน)

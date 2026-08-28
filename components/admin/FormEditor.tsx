@@ -46,6 +46,8 @@ export function FormEditor({
         isForceClosed: Boolean(config.isForceClosed),
         startDate: config.startDate || "",
         endDate: config.endDate || "",
+        currentBatch: config.currentBatch,
+        batches: config.batches || [],
       };
       await saveFormConfig(configToSave);
       onSave(configToSave);
@@ -125,7 +127,12 @@ export function FormEditor({
     <div className="space-y-6">
       <div className="flex items-center justify-between bg-white rounded-xl border border-gray-200 p-4">
         <div>
-          <h2 className="font-semibold text-gray-800">จัดการข้อมูลแบบประเมิน</h2>
+          <div className="flex items-center gap-2">
+            <h2 className="font-semibold text-gray-800">จัดการข้อมูลแบบประเมิน</h2>
+            <span className="px-2 py-0.5 rounded text-xs font-bold bg-blue-100 text-blue-700 border border-blue-200">
+              รุ่นที่ {config.currentBatch ?? 42}
+            </span>
+          </div>
           <p className="text-xs text-gray-500 mt-1">
             แก้ไขข้อมูลแล้วกดบันทึก ข้อมูลใหม่จะแสดงในแบบประเมินทันที
           </p>

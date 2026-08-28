@@ -10,8 +10,8 @@ import { LogOut, Stethoscope, FlaskConical, RotateCcw, BarChart3, Clock, AlertTr
 import { IS_MOCK } from "@/lib/mockMode";
 import { mockReset } from "@/lib/mockStore";
 import { isAdmin, HAS_ADMINS } from "@/lib/admin";
-import { FORMS_META, type FormConfig } from "@/lib/formData";
-import type { FormId } from "@/types";
+import { getFormsMeta, type FormConfig } from "@/lib/formData";
+import type { FormId, FormCardMeta } from "@/types";
 import toast from "react-hot-toast";
 
 export default function HubPage() {
@@ -20,6 +20,7 @@ export default function HubPage() {
   const [completedForms, setCompletedForms] = useState<FormId[]>([]);
   const [config, setConfig] = useState<FormConfig | null>(null);
   const [fetchingStatus, setFetchingStatus] = useState(true);
+  const [formsMeta, setFormsMeta] = useState<FormCardMeta[]>([]);
 
   useEffect(() => {
     if (!loading) {
@@ -33,10 +34,15 @@ export default function HubPage() {
 
   useEffect(() => {
     if (!user) return;
-    Promise.all([getCompletedForms(user.uid), getFormConfig()])
-      .then(([forms, conf]) => {
-        setCompletedForms(forms);
+    getFormConfig()
+      .then((conf) => {
         setConfig(conf);
+        setFormsMeta(getFormsMeta(conf.currentBatch));
+        // Use batch-aware completedForms
+        return getCompletedForms(user.uid, conf.currentBatch);
+      })
+      .then((forms) => {
+        setCompletedForms(forms);
       })
       .finally(() => setFetchingStatus(false));
   }, [user]);
@@ -157,7 +163,9 @@ export default function HubPage() {
             </div>
             <div>
               <span className="font-bold text-slate-800 text-sm sm:text-base leading-tight block">ระบบประเมินความพึงพอใจ</span>
-              <span className="text-[11px] text-slate-400 font-medium">หลักสูตรพยาบาลวิสัญญี</span>
+              <span className="text-[11px] text-slate-400 font-medium">
+                หลักสูตรพยาบาลวิสัญญี {config ? `รุ่นที่ ${config.currentBatch}` : ""}
+              </span>
             </div>
           </div>
           <div className="flex items-center gap-3">
@@ -212,7 +220,6 @@ export default function HubPage() {
               <h1 className="text-xl sm:text-2xl font-bold text-slate-800 mt-1">
                 {user.displayName || "ผู้ใช้งาน"}
               </h1>
-              <p className="text-slate-400 text-xs sm:text-sm">{user.email}</p>
             </div>
             <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-600 text-white flex items-center justify-center text-lg font-bold shadow-md shadow-blue-500/20 shrink-0">
               {(user.displayName || user.email || "U").slice(0, 1).toUpperCase()}
@@ -224,13 +231,13 @@ export default function HubPage() {
             <div className="flex items-center justify-between text-xs sm:text-sm font-semibold mb-2">
               <span className="text-slate-600">ความคืบหน้าการทำแบบประเมิน</span>
               <span className="text-blue-600 font-bold">
-                {completed} จาก {FORMS_META.length} ชุด ({Math.round((completed / FORMS_META.length) * 100)}%)
+                {completed} จาก {formsMeta.length} ชุด ({Math.round((completed / (formsMeta.length || 1)) * 100)}%)
               </span>
             </div>
             <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden">
               <div
                 className="h-full bg-gradient-to-r from-blue-600 via-indigo-600 to-emerald-500 rounded-full transition-all duration-500"
-                style={{ width: `${(completed / FORMS_META.length) * 100}%` }}
+                style={{ width: `${(completed / (formsMeta.length || 1)) * 100}%` }}
               />
             </div>
           </div>
@@ -239,7 +246,7 @@ export default function HubPage() {
         {timerUI}
 
         <div className="space-y-4">
-          {FORMS_META.map((form) => (
+          {formsMeta.map((form) => (
             <FormCard
               key={form.id}
               {...form}

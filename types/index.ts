@@ -14,6 +14,15 @@ export interface UserDoc {
   displayName: string;
   createdAt: Timestamp;
   completedForms: FormId[];
+  batchId?: number;
+  batches?: number[];
+}
+
+export interface BatchMeta {
+  id: number;
+  label: string;
+  createdAt: string;
+  isActive: boolean;
 }
 
 export interface FormSubmission {
@@ -23,6 +32,7 @@ export interface FormSubmission {
   evaluatorName: string;
   submittedAt: Timestamp;
   answers: Record<string, unknown>;
+  batchId?: number;
 }
 
 export interface FormCardMeta {
@@ -40,6 +50,7 @@ export interface StoredSubmission {
   evaluatorName: string;
   submittedAt: string;
   answers: Record<string, unknown>;
+  batchId?: number;
 }
 
 export interface UserSummary {
@@ -48,4 +59,6 @@ export interface UserSummary {
   displayName: string;
   completedForms: FormId[];
   createdAt: string;
+  batchId?: number;
+  batches?: number[];
 }
