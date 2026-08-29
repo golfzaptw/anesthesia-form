@@ -12,7 +12,7 @@ export function SystemInfoModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
       <div
-        className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-100 relative overflow-hidden animate-in zoom-in-95 duration-200"
+        className="bg-white rounded-2xl sm:rounded-3xl max-w-md w-full p-5 sm:p-6 shadow-2xl border border-slate-100 relative overflow-hidden animate-in zoom-in-95 duration-200 max-h-[88vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Background gradient decorative glow */}

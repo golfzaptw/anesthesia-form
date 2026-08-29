@@ -73,7 +73,7 @@ export function ScaleInput({
 
   return (
     <div
-      className={`rounded-2xl border transition-all duration-200 p-4 sm:p-5 bg-white ${
+      className={`rounded-2xl border transition-all duration-200 p-3.5 sm:p-5 bg-white ${
         error
           ? "border-rose-300 bg-rose-50/30 ring-1 ring-rose-300 shadow-sm"
           : currentOption
@@ -81,15 +81,15 @@ export function ScaleInput({
           : "border-slate-200 shadow-sm hover:border-slate-300"
       }`}
     >
-      <div className="flex items-start justify-between gap-3 mb-3">
-        <div className="flex items-start gap-2.5">
+      <div className="flex items-start justify-between gap-2 sm:gap-3 mb-3">
+        <div className="flex items-start gap-2 sm:gap-2.5">
           {questionNumber !== undefined && (
-            <span className="flex-shrink-0 flex items-center justify-center w-6 h-6 rounded-lg bg-blue-50 text-blue-700 text-xs font-bold border border-blue-100">
+            <span className="flex-shrink-0 flex items-center justify-center w-5 h-5 sm:w-6 sm:h-6 rounded-md sm:rounded-lg bg-blue-50 text-blue-700 text-[11px] sm:text-xs font-bold border border-blue-100 mt-0.5 sm:mt-0">
               {questionNumber}
             </span>
           )}
           <div>
-            <p className="text-sm font-semibold text-slate-800 leading-snug">
+            <p className="text-xs sm:text-sm font-semibold text-slate-800 leading-snug">
               {label}
               {required && <span className="text-rose-500 ml-1 font-bold">*</span>}
             </p>
@@ -108,14 +108,14 @@ export function ScaleInput({
 
       {/* Scale Buttons Container */}
       <div className="pt-1">
-        <div className="grid grid-cols-5 gap-1.5 sm:gap-2.5">
+        <div className="grid grid-cols-5 gap-1 sm:gap-2.5">
           {SCALE_OPTIONS.map((opt) => {
             const isSelected = currentVal === opt.val;
 
             return (
               <label
                 key={opt.val}
-                className={`relative flex flex-col items-center justify-center py-2.5 px-1 sm:px-2 rounded-xl border-2 cursor-pointer transition-all duration-150 select-none text-center ${
+                className={`relative flex flex-col items-center justify-center py-2 sm:py-2.5 px-0.5 sm:px-2 rounded-xl border-2 cursor-pointer transition-all duration-150 select-none text-center min-h-[52px] sm:min-h-[62px] ${
                   isSelected
                     ? `${opt.activeClass} shadow-md scale-[1.02] ring-2 ring-offset-1`
                     : `bg-slate-50/80 border-slate-200 text-slate-700 ${opt.hoverClass} active:scale-95`
@@ -131,14 +131,14 @@ export function ScaleInput({
                   })}
                 />
                 <span
-                  className={`text-base sm:text-lg font-bold tracking-tight ${
+                  className={`text-sm sm:text-lg font-bold tracking-tight ${
                     isSelected ? "text-white" : "text-slate-800"
                   }`}
                 >
                   {opt.label}
                 </span>
                 <span
-                  className={`text-[10px] sm:text-xs font-medium line-clamp-1 mt-0.5 transition-colors ${
+                  className={`text-[9px] xs:text-[10px] sm:text-xs font-medium block truncate max-w-full mt-0.5 transition-colors ${
                     isSelected ? "text-white/95 font-semibold" : "text-slate-500"
                   }`}
                 >

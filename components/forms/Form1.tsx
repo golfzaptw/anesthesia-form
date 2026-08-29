@@ -96,17 +96,17 @@ export function Form1({
   return (
     <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-6">
       {/* Hero Header Banner */}
-      <div className="relative overflow-hidden bg-gradient-to-br from-blue-700 via-indigo-700 to-blue-900 text-white rounded-3xl p-6 sm:p-8 shadow-lg shadow-blue-900/10">
+      <div className="relative overflow-hidden bg-gradient-to-br from-blue-700 via-indigo-700 to-blue-900 text-white rounded-2xl sm:rounded-3xl p-4 sm:p-8 shadow-lg shadow-blue-900/10">
         <div className="relative z-10">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/15 backdrop-blur-md text-blue-100 text-xs font-semibold mb-3 border border-white/10">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/15 backdrop-blur-md text-blue-100 text-xs font-semibold mb-2.5 sm:mb-3 border border-white/10">
             <BookOpen className="w-3.5 h-3.5" />
             <span>แบบประเมินที่ 1 • ด้านการจัดการเรียนการสอน</span>
           </div>
 
-          <h1 className="text-xl sm:text-2xl font-bold leading-tight">
+          <h1 className="text-lg sm:text-2xl font-bold leading-tight">
             แบบประเมินความพึงพอใจของนักเรียนพยาบาลวิสัญญี รุ่นที่ {batchId ?? 42}
           </h1>
-          <p className="mt-1.5 text-blue-200 text-sm sm:text-base font-medium">
+          <p className="mt-1 text-blue-200 text-xs sm:text-base font-medium">
             ต่อหลักสูตรวิสัญญีฯ ด้านการจัดการเรียนการสอน
           </p>
 

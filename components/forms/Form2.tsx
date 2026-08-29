@@ -107,17 +107,17 @@ function InstructorSection({
       <button
         type="button"
         onClick={onToggleOpen}
-        className="w-full flex items-center justify-between p-4 sm:p-5 text-left bg-gradient-to-r from-purple-50/90 via-fuchsia-50/30 to-slate-50 hover:bg-purple-50 transition-colors gap-3"
+        className="w-full flex items-center justify-between p-3.5 sm:p-5 text-left bg-gradient-to-r from-purple-50/90 via-fuchsia-50/30 to-slate-50 hover:bg-purple-50 transition-colors gap-2 sm:gap-3"
       >
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-purple-600 text-white flex items-center justify-center font-bold text-xs sm:text-sm shrink-0 shadow-sm">
+        <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+          <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl bg-purple-600 text-white flex items-center justify-center font-bold text-xs sm:text-sm shrink-0 shadow-sm">
             {index + 1}
           </div>
           <div className="min-w-0">
-            <span className="font-bold text-slate-800 text-sm sm:text-base leading-snug block truncate">
+            <span className="font-bold text-slate-800 text-xs sm:text-base leading-snug block truncate">
               {name}
             </span>
-            <span className="text-xs text-purple-700 font-medium">อาจารย์วิสัญญีแพทย์</span>
+            <span className="text-[11px] sm:text-xs text-purple-700 font-medium">อาจารย์วิสัญญีแพทย์</span>
           </div>
         </div>
 

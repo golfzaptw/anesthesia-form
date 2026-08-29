@@ -23,13 +23,13 @@ export function StatCard({
   tone = "blue",
 }: StatCardProps) {
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-4">
-      <div className={`inline-flex rounded-lg p-2 mb-3 ${TONES[tone]}`}>
-        <Icon className="w-4 h-4" />
+    <div className="bg-white rounded-xl border border-gray-200 p-3 sm:p-4 shadow-sm">
+      <div className={`inline-flex rounded-lg p-1.5 sm:p-2 mb-2 sm:mb-3 ${TONES[tone]}`}>
+        <Icon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
       </div>
-      <p className="text-2xl font-bold text-gray-800 leading-none">{value}</p>
-      <p className="text-xs text-gray-500 mt-1.5">{label}</p>
-      {sub && <p className="text-[11px] text-gray-400 mt-0.5">{sub}</p>}
+      <p className="text-xl sm:text-2xl font-bold text-gray-800 leading-none truncate">{value}</p>
+      <p className="text-[11px] sm:text-xs text-gray-500 mt-1.5 line-clamp-1">{label}</p>
+      {sub && <p className="text-[10px] sm:text-[11px] text-gray-400 mt-0.5 truncate">{sub}</p>}
     </div>
   );
 }

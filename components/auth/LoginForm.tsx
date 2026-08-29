@@ -97,46 +97,49 @@ export function LoginForm() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 px-4">
-      {generatedPassword ? (
-        <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-sm border-t-4 border-blue-500">
-          <h3 className="text-lg font-bold text-gray-800 mb-2">สร้างชื่อสำเร็จ!</h3>
-          <p className="text-sm text-gray-600 mb-4">
-            นี่คือชื่อและรหัสผ่านของคุณ กรุณา<strong>แคปหน้าจอ</strong> หรือจดบันทึกไว้ เพื่อใช้ล็อกอินกลับเข้ามาทำแบบประเมินต่อในครั้งหน้า
-          </p>
-          <div className="bg-gray-50 rounded-lg border border-gray-200 p-4 mb-5 text-center space-y-3">
-            <div>
-              <p className="text-xs text-gray-500 font-medium mb-1">ชื่อผู้ประเมิน</p>
-              <span className="text-lg font-semibold text-gray-800">
-                {getValues("displayName")}
-              </span>
+    <div className="min-h-[100dvh] flex flex-col justify-between items-center bg-gradient-to-br from-blue-50 to-indigo-100 px-4 py-4 sm:py-8">
+      <div className="w-full flex-1 flex items-center justify-center py-2">
+        {generatedPassword ? (
+          <div className="bg-white rounded-2xl shadow-xl p-5 sm:p-6 w-full max-w-sm border-t-4 border-blue-500">
+            <h3 className="text-lg font-bold text-gray-800 mb-2">สร้างชื่อสำเร็จ!</h3>
+            <p className="text-xs sm:text-sm text-gray-600 mb-4 leading-relaxed">
+              นี่คือชื่อและรหัสผ่านของคุณ กรุณา<strong>แคปหน้าจอ</strong> หรือจดบันทึกไว้ เพื่อใช้ล็อกอินกลับเข้ามาทำแบบประเมินต่อในครั้งหน้า
+            </p>
+            <div className="bg-gray-50 rounded-xl border border-gray-200 p-4 mb-5 text-center space-y-3">
+              <div>
+                <p className="text-xs text-gray-500 font-medium mb-1">ชื่อผู้ประเมิน</p>
+                <span className="text-base sm:text-lg font-semibold text-gray-800">
+                  {getValues("displayName")}
+                </span>
+              </div>
+              <div className="pt-3 border-t border-gray-200">
+                <p className="text-xs text-gray-500 font-medium mb-1">รหัสผ่าน</p>
+                <span className="text-2xl sm:text-3xl font-mono font-bold tracking-wider text-blue-600">
+                  {generatedPassword}
+                </span>
+              </div>
             </div>
-            <div className="pt-3 border-t border-gray-200">
-              <p className="text-xs text-gray-500 font-medium mb-1">รหัสผ่าน</p>
-              <span className="text-3xl font-mono font-bold tracking-wider text-blue-600">
-                {generatedPassword}
-              </span>
-            </div>
+            <button
+              onClick={() => {
+                setGeneratedPassword(null);
+                proceedToApp();
+              }}
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 rounded-xl transition-colors shadow-sm"
+            >
+              รับทราบ แคปหน้าจอแล้ว
+            </button>
           </div>
-          <button
-            onClick={() => {
-              setGeneratedPassword(null);
-              proceedToApp();
-            }}
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 rounded-lg transition-colors"
-          >
-            รับทราบ แคปหน้าจอแล้ว
-          </button>
-        </div>
-      ) : (
-        <div className="w-full max-w-md bg-white rounded-2xl shadow-xl p-8">
-          <div className="flex flex-col items-center mb-8">
-            <div className="bg-blue-600 text-white rounded-full p-3 mb-4">
-              <Stethoscope className="w-8 h-8" />
+        ) : (
+          <div className="w-full max-w-md bg-white rounded-2xl sm:rounded-3xl shadow-xl p-5 sm:p-8">
+            <div className="flex flex-col items-center mb-6 sm:mb-8">
+              <div className="bg-gradient-to-tr from-blue-600 to-indigo-600 text-white rounded-2xl p-3 mb-3 shadow-md shadow-blue-500/20">
+                <Stethoscope className="w-7 h-7 sm:w-8 sm:h-8" />
+              </div>
+              <h1 className="text-lg sm:text-2xl font-bold text-gray-800 text-center leading-snug">
+                แบบประเมินวิสัญญีแพทย์และวิสัญญีพยาบาล
+              </h1>
+              <p className="text-gray-500 text-xs sm:text-sm mt-1 text-center">หลักสูตรพยาบาลวิสัญญี</p>
             </div>
-            <h1 className="text-2xl font-bold text-gray-800 text-center">แบบประเมินวิสัญญีแพทย์และวิสัญญีพยาบาล</h1>
-            <p className="text-gray-500 text-sm mt-1 text-center">พยาบาลวิสัญญี</p>
-          </div>
 
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             {!isAdminTab ? (
@@ -281,7 +284,7 @@ export function LoginForm() {
             <button
               type="submit"
               disabled={submitting}
-              className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white font-semibold py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2"
+              className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white font-semibold py-2.5 rounded-xl transition-colors flex items-center justify-center gap-2 shadow-sm"
             >
               {submitting ? (
                 <>
@@ -297,7 +300,8 @@ export function LoginForm() {
           </form>
         </div>
       )}
-      <Footer className="absolute bottom-1 left-0 right-0" />
+      </div>
+      <Footer className="mt-4 w-full" />
     </div>
   );
 }

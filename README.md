@@ -14,6 +14,7 @@
 ## 🌟 ฟีเจอร์หลัก (Key Features)
 
 ### 1. แบบประเมินมาตรฐาน 3 ชุด (Comprehensive Survey Forms)
+
 - **ชุดที่ 1: การจัดการเรียนการสอน (Curriculum & Teaching Evaluation)**
   - ประเมินความพึงพอใจ 10 ด้านหลัก (สเกลคะแนน 1–5)
   - ช่องรับข้อเสนอแนะและข้อคิดเห็นเพิ่มเติมเพื่อการพัฒนาหลักสูตร
@@ -25,27 +26,33 @@
   - มีระบบ **"เคยพบ / ไม่เคยพบ" (Skip Option)** สำหรับตำแหน่งหรือแผนกที่นักเรียนอาจไม่ได้ร่วมงานครบทุกคน
 
 ### 2. ระบบประเมินแบบไม่เปิดเผยตัวตน (Anonymous & Privacy-First)
+
 - นักเรียนสามารถสร้างชื่อเข้าระบบและรับรหัสผ่านอัตโนมัติ โดยไม่ต้องใช้อีเมลส่วนตัว
 - ติดตามสถานะความคืบหน้าการส่งแบบประเมินส่วนตัว (Progress Tracker) ในหน้า Hub
 
 ### 3. ระบบแยกข้อมูลตามรุ่นการศึกษา (Academic Year / Batch Separation)
+
 - **สลับดูผลย้อนหลัง**: ผู้ดูแลระบบสามารถเลือกดูสถิติ, กราฟ, และคะแนนเฉลี่ยของรุ่นก่อนหน้าได้
 - **สร้างรุ่นใหม่ผ่าน UI**: ผู้ดูแลระบบสามารถสร้างรุ่นถัดไป (เช่น รุ่น 43 ➔ รุ่น 44) ได้ทันทีผ่านหน้า Admin โดยระบบจะเปิดรอบใหม่ให้นักเรียนทำแบบประเมิน
 - **โหมด Read-Only สำหรับรุ่นเก่า**: รุ่นในอดีตจะถูกล็อคให้อยู่ในโหมดอ่านอย่างเดียว (ป้องกันการแก้ไขหรือลบข้อมูล) แต่ยังสามารถดาวน์โหลดรายงาน CSV ได้ตลอดเวลา
 
 ### 4. แดชบอร์ดวิเคราะห์ผลและส่งออกข้อมูล (Admin Analytics & CSV Export)
+
 - กราฟแท่งแสดงคะแนนเฉลี่ยรายข้อ, สถิติภาพรวม, และอัตราการตอบกลับ (Response Rate)
 - รวมข้อเสนอแนะและคอมเมนต์ของนักเรียนแยกตามหมวดหมู่
 - **ดาวน์โหลด CSV**: ส่งออกไฟล์รายงานสรุปผลการประเมินทุกชุด รองรับภาษาไทยสมบูรณ์ (UTF-8 with BOM สำหรับ Microsoft Excel)
 
 ### 5. ระบบกำหนดเวลาและควบคุมการเปิด-ปิด (Scheduling & Force Close)
+
 - กำหนดวันและเวลาเปิด-ปิดรับคำตอบล่วงหน้า พร้อมระบบนับถอยหลัง (Countdown Timer)
 - สวิตช์ **Force Close** บังคับปิดรับคำตอบทันทีในกรณีฉุกเฉิน
 
 ### 6. ปรับแต่งข้อมูลแบบฟอร์มได้เอง (Dynamic Form Editor)
+
 - เพิ่ม/แก้ไข/ลบหัวข้อคำถาม, รายชื่ออาจารย์แพทย์, แผนก และรายชื่อพยาบาลวิสัญญีผ่านหน้า Admin โดยไม่ต้องแก้ไข Source Code
 
 ### 7. โหมดทดสอบ Local Demo (Mock Store)
+
 - รองรับการทำงานทั้งแบบเชื่อมต่อ **Firebase Firestore** จริง และโหมด **Mock Mode (LocalStorage)** เพื่อทดสอบระบบได้ทันทีโดยไม่ต้องตั้งค่า Cloud
 
 ---
@@ -99,9 +106,13 @@ student-form/
 │       ├── EvaluatorBadge.tsx        # ป้ายแสดงชื่อผู้ประเมิน
 │       ├── Footer.tsx                # Minimalist Footer with Credits
 │       ├── FormCard.tsx              # การ์ดแบบประเมินในหน้า Hub
-│       ├── RatingInput.tsx           # ตัวเลือกให้คะแนน 1-5
+│       ├── RadioGroup.tsx            # Radio selector
+│       ├── ScaleInput.tsx            # ตัวเลือกให้คะแนน 1-5
+│       ├── SectionHeader.tsx         # หัวข้อกลุ่มคำถาม
+│       ├── SubmitButton.tsx          # ปุ่ม Submit ฟอร์ม
 │       ├── SystemInfoModal.tsx       # หน้าต่างข้อมูลระบบและลิขสิทธิ์
-│       └── TextAreaInput.tsx         # ช่องกรอกข้อความ/ความคิดเห็น
+│       ├── TextAreaInput.tsx         # ช่องกรอกข้อความ/ความคิดเห็น
+│       └── TextInput.tsx             # ช่องกรอกข้อความสั้น
 ├── contexts/                         # React Contexts
 │   └── AuthContext.tsx               # Context จัดการสถานะผู้ใช้ (Auth & Guest)
 ├── lib/                              # Business Logic & Utility Functions
@@ -125,10 +136,12 @@ student-form/
 ## 🚀 การติดตั้งและเริ่มใช้งาน (Getting Started)
 
 ### ข้อกำหนดเบื้องต้น (Prerequisites)
+
 - [Node.js](https://nodejs.org/) เวอร์ชัน 18.17.0 ขึ้นไป
 - [npm](https://www.npmjs.com/) หรือ [yarn](https://yarnpkg.com/) / [pnpm](https://pnpm.io/)
 
 ### 1. Clone Repository และติดตั้ง Dependencies
+
 ```bash
 git clone https://github.com/golfzaptw/anesthesia-form.git
 cd student-form
@@ -136,12 +149,15 @@ npm install
 ```
 
 ### 2. กำหนดค่า Environment Variables
+
 สร้างไฟล์ `.env.local` ที่ Root Directory:
+
 ```bash
 cp .env.example .env.local
 ```
 
 ตั้งค่าตัวแปรใน `.env.local`:
+
 ```env
 # ตั้งค่า Firebase Web App (จาก Firebase Console)
 NEXT_PUBLIC_FIREBASE_API_KEY=your_api_key
@@ -159,12 +175,15 @@ NEXT_PUBLIC_USE_MOCK=false
 ```
 
 ### 3. รัน Development Server
+
 ```bash
 npm run dev
 ```
+
 เปิดบราวเซอร์ไปที่ [http://localhost:3000](http://localhost:3000)
 
 ### 4. Build สำหรับ Production
+
 ```bash
 npm run build
 npm run start

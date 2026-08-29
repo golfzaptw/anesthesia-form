@@ -300,7 +300,7 @@ export default function AdminPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
-        <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
+        <div className="max-w-4xl mx-auto px-4 py-3 flex flex-wrap sm:flex-nowrap items-center justify-between gap-2">
           <span className="text-sm font-bold text-gray-800 flex items-center gap-2">
             <BarChart3 className="w-5 h-5 text-blue-600" />
             สรุปผลสำหรับผู้ดูแล
@@ -313,7 +313,7 @@ export default function AdminPage() {
               toast.success("ออกจากระบบแล้ว");
               router.replace("/login");
             }}
-            className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-red-600 transition-colors"
+            className="flex items-center gap-1.5 text-xs sm:text-sm text-gray-500 hover:text-red-600 transition-colors"
           >
             <LogOut className="w-4 h-4" />
             ออกจากระบบ
@@ -321,31 +321,35 @@ export default function AdminPage() {
         </div>
       </header>
 
-      <main className="max-w-4xl mx-auto px-4 py-6">
+      <main className="max-w-4xl mx-auto px-4 py-4 sm:py-6">
         {/* Batch Selector */}
         {config && config.batches.length > 0 && (
-          <div className="mb-4 flex items-center justify-between">
+          <div className="mb-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
             <div className="relative">
               <button
                 onClick={() => setShowBatchDropdown(!showBatchDropdown)}
-                className="flex items-center gap-2 bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-gray-800 hover:border-blue-300 hover:bg-blue-50/30 transition-all shadow-sm"
+                className="w-full sm:w-auto flex items-center justify-between sm:justify-start gap-2 bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-gray-800 hover:border-blue-300 hover:bg-blue-50/30 transition-all shadow-sm"
               >
-                <Layers className="w-4 h-4 text-blue-600" />
-                <span>
-                  {config.batches.find((b) => b.id === activeBatch)?.label ?? `รุ่นที่ ${activeBatch}`}
-                </span>
-                {isViewingCurrentBatch && (
-                  <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-700 border border-emerald-200">
-                    ปัจจุบัน
+                <div className="flex items-center gap-2">
+                  <Layers className="w-4 h-4 text-blue-600 shrink-0" />
+                  <span>
+                    {config.batches.find((b) => b.id === activeBatch)?.label ?? `รุ่นที่ ${activeBatch}`}
                   </span>
-                )}
-                <ChevronDown className="w-4 h-4 text-gray-400" />
+                </div>
+                <div className="flex items-center gap-1.5">
+                  {isViewingCurrentBatch && (
+                    <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-700 border border-emerald-200">
+                      ปัจจุบัน
+                    </span>
+                  )}
+                  <ChevronDown className="w-4 h-4 text-gray-400 shrink-0" />
+                </div>
               </button>
 
               {showBatchDropdown && (
                 <>
                   <div className="fixed inset-0 z-20" onClick={() => setShowBatchDropdown(false)} />
-                  <div className="absolute left-0 top-full mt-1 z-30 bg-white rounded-xl border border-gray-200 shadow-lg min-w-[200px] py-1 animate-in fade-in zoom-in-95 duration-150">
+                  <div className="absolute left-0 top-full mt-1 z-30 bg-white rounded-xl border border-gray-200 shadow-lg min-w-[200px] w-full sm:w-auto py-1 animate-in fade-in zoom-in-95 duration-150">
                     {[...config.batches].reverse().map((b) => (
                       <button
                         key={b.id}
@@ -377,7 +381,7 @@ export default function AdminPage() {
 
             <button
               onClick={() => setShowNewBatchModal(true)}
-              className="flex items-center gap-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-4 py-2.5 rounded-xl text-sm font-semibold shadow-sm shadow-blue-500/20 transition-all"
+              className="flex items-center justify-center gap-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-4 py-2.5 rounded-xl text-sm font-semibold shadow-sm shadow-blue-500/20 transition-all"
             >
               <Plus className="w-4 h-4" />
               สร้างรุ่นใหม่
@@ -528,14 +532,14 @@ export default function AdminPage() {
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-1 mb-5 overflow-x-auto pb-1">
+        <div className="flex gap-1.5 mb-5 overflow-x-auto pb-2 -mx-4 px-4 sm:mx-0 sm:px-0">
           {TABS.map((t) => (
             <button
               key={t.id}
               onClick={() => setTab(t.id)}
-              className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
+              className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-medium whitespace-nowrap transition-colors shrink-0 ${
                 tab === t.id
-                  ? "bg-blue-600 text-white"
+                  ? "bg-blue-600 text-white shadow-sm"
                   : "bg-white text-gray-600 border border-gray-200 hover:bg-gray-50"
               }`}
             >
@@ -547,7 +551,7 @@ export default function AdminPage() {
         {/* Overview: per-user completion */}
         {tab === "overview" && (
           <div className="space-y-4">
-            <div className="grid sm:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               {formsMeta.map((f) => (
                 <div key={f.id} className="bg-white rounded-xl border border-gray-200 p-4">
                   <p className="text-xs text-gray-500 leading-snug">{f.title}</p>
@@ -577,8 +581,8 @@ export default function AdminPage() {
                   ยังไม่มีผู้ลงทะเบียนในรุ่นนี้
                 </p>
               ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
+                <div className="overflow-x-auto w-full">
+                  <table className="w-full text-xs sm:text-sm min-w-[480px]">
                     <thead className="bg-gray-50 text-gray-500">
                       <tr>
                         <th className="text-left font-medium px-4 py-2">ชื่อผู้ประเมิน</th>
@@ -594,8 +598,8 @@ export default function AdminPage() {
                       {batchUsers.map((u) => (
                         <tr key={u.uid} className="border-t border-gray-100">
                           <td className="px-4 py-2">
-                            <p className="text-gray-800">{u.displayName || "—"}</p>
-                            <p className="text-xs text-gray-400">{u.email}</p>
+                            <p className="font-medium text-gray-800">{u.displayName || "—"}</p>
+                            <p className="text-[11px] text-gray-400">{u.email}</p>
                           </td>
                           {formsMeta.map((f) => {
                             const isCompleted = byForm[f.id].some(
