@@ -265,8 +265,8 @@ export default function AdminPage() {
 
   const handleExport = (formId: FormId) => {
     const subs = byForm[formId];
-    if (!subs.length) return;
-    downloadCsv(`${formId}_batch${activeBatch}_submissions.csv`, submissionsToCsv(subs));
+    if (!subs.length || !config) return;
+    downloadCsv(`${formId}_batch${activeBatch}_submissions.csv`, submissionsToCsv(subs, formId, config));
   };
 
   const handleDeleteUser = async () => {
