@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
-import { getCompletedForms, getFormConfig } from "@/lib/firestore";
+import { getCompletedForms, getFormConfig, getEditCount, getExistingSubmission } from "@/lib/firestore";
 import type { FormConfig } from "@/lib/formData";
 import { Form1 } from "@/components/forms/Form1";
 import { ArrowLeft, Loader2 } from "lucide-react";
@@ -13,29 +13,50 @@ export default function Form1Page() {
   const { user, loading } = useAuth();
   const router = useRouter();
   const [config, setConfig] = useState<FormConfig | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [existingAnswers, setExistingAnswers] = useState<Record<string, unknown> | null>(null);
 
   useEffect(() => {
     if (loading || !user) return;
-    getFormConfig().then((conf) => {
+    let cancelled = false;
+
+    (async () => {
+      const conf = await getFormConfig();
       const now = Date.now();
       const startMs = conf.startDate ? new Date(conf.startDate).getTime() : 0;
       const endMs = conf.endDate ? new Date(conf.endDate).getTime() : 0;
-      
+
       if (
-        conf.isForceClosed || 
-        (startMs > 0 && now < startMs) || 
+        conf.isForceClosed ||
+        (startMs > 0 && now < startMs) ||
         (endMs > 0 && now > endMs)
       ) {
         router.replace("/hub");
         return;
       }
-      setConfig(conf);
 
       // Batch-aware check only
-      getCompletedForms(user.uid, conf.currentBatch).then((batchCompleted) => {
-        if (batchCompleted.includes("form_1")) router.replace("/hub");
-      });
-    });
+      const batchCompleted = await getCompletedForms(user.uid, conf.currentBatch);
+      if (batchCompleted.includes("form_1")) {
+        // Only editCount === 0 is editable; -1 means there is no editable record.
+        const editCount = await getEditCount(user.uid, "form_1", conf.currentBatch);
+        if (editCount !== 0) {
+          router.replace("/hub");
+          return;
+        }
+        const answers = await getExistingSubmission(user.uid, "form_1", conf.currentBatch);
+        if (cancelled) return;
+        setIsEditing(true);
+        setExistingAnswers(answers);
+      }
+
+      if (cancelled) return;
+      setConfig(conf);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [user, loading, router]);
 
   if (loading || !user || !config) {
@@ -63,14 +84,20 @@ export default function Form1Page() {
           </Link>
 
           <div className="flex items-center gap-2 text-xs font-semibold text-slate-500">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block animate-pulse" />
-            <span>โหมดประเมิน</span>
+            <span className={`w-2 h-2 rounded-full inline-block animate-pulse ${isEditing ? "bg-amber-500" : "bg-emerald-500"}`} />
+            <span>{isEditing ? "โหมดแก้ไข" : "โหมดประเมิน"}</span>
           </div>
         </div>
       </header>
 
       <main className="max-w-2xl mx-auto px-4 pt-6">
-        <Form1 userId={user.uid} questions={config.form1Questions} batchId={config.currentBatch} />
+        <Form1
+          userId={user.uid}
+          questions={config.form1Questions}
+          batchId={config.currentBatch}
+          isEditing={isEditing}
+          existingAnswers={existingAnswers}
+        />
       </main>
     </div>
   );
