@@ -1,16 +1,18 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { useForm } from "react-hook-form";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { submitFormResponse, markFormComplete } from "@/lib/firestore";
+import { useDraftAutoSave } from "@/lib/useDraftAutoSave";
+import { submitWithRetry, getSubmitErrorMessage } from "@/lib/submitWithRetry";
 import { TextAreaInput } from "@/components/ui/TextAreaInput";
 import { ScaleInput } from "@/components/ui/ScaleInput";
 import { SubmitButton } from "@/components/ui/SubmitButton";
 import { EvaluatorBadge } from "@/components/ui/EvaluatorBadge";
-import { BookOpen, CheckCircle2, AlertCircle, HelpCircle } from "lucide-react";
+import { BookOpen, CheckCircle2, AlertCircle, HelpCircle, Save } from "lucide-react";
 
 type Form1Values = Record<string, string>;
 
@@ -34,10 +36,27 @@ export function Form1({
     handleSubmit,
     watch,
     clearErrors,
+    setValue,
+    getValues,
     formState: { errors },
   } = useForm<Form1Values>();
 
   const formValues = watch();
+
+  // Auto-save draft to localStorage
+  const onDraftRestored = useCallback(() => {
+    toast.success("โหลดข้อมูลที่เคยกรอกค้างไว้แล้ว", { icon: "📋", duration: 4000 });
+  }, []);
+
+  const { lastSavedAt, clearDraft, isSaving } = useDraftAutoSave<Form1Values>({
+    formId: "form_1",
+    batchId,
+    userId,
+    getValues,
+    setValue,
+    watchedValues: formValues,
+    onDraftRestored,
+  });
 
   // Auto-clear suggestion errors when score changes to >= 3
   useEffect(() => {
@@ -75,19 +94,22 @@ export function Form1({
     if (!user) return;
     setSubmitting(true);
     try {
-      await submitFormResponse({
-        formId: "form_1",
-        userId,
-        userEmail: user.email ?? "",
-        evaluatorName: user.displayName ?? "",
-        answers: data as unknown as Record<string, unknown>,
-        batchId,
+      await submitWithRetry(async () => {
+        await submitFormResponse({
+          formId: "form_1",
+          userId,
+          userEmail: user.email ?? "",
+          evaluatorName: user.displayName ?? "",
+          answers: data as unknown as Record<string, unknown>,
+          batchId,
+        });
+        await markFormComplete(userId, "form_1", batchId);
       });
-      await markFormComplete(userId, "form_1", batchId);
+      clearDraft();
       toast.success("ส่งแบบประเมินสำเร็จ!");
       router.replace("/hub");
-    } catch {
-      toast.error("เกิดข้อผิดพลาด กรุณาลองใหม่");
+    } catch (err) {
+      toast.error(getSubmitErrorMessage(err), { duration: 6000 });
     } finally {
       setSubmitting(false);
     }
@@ -172,6 +194,15 @@ export function Form1({
             style={{ width: `${progressPercent}%` }}
           />
         </div>
+        {/* Draft auto-save indicator */}
+        {lastSavedAt && (
+          <div className="mt-2 flex items-center gap-1.5 text-[11px] text-slate-400">
+            <Save className="w-3 h-3" />
+            <span>
+              {isSaving ? "กำลังบันทึกร่าง..." : `บันทึกร่างอัตโนมัติเมื่อ ${new Date(lastSavedAt).toLocaleTimeString("th-TH")}`}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Questions list */}

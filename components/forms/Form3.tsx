@@ -1,11 +1,13 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { useForm, type FieldErrors } from "react-hook-form";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { submitFormResponse, markFormComplete } from "@/lib/firestore";
+import { useDraftAutoSave } from "@/lib/useDraftAutoSave";
+import { submitWithRetry, getSubmitErrorMessage } from "@/lib/submitWithRetry";
 import { SubmitButton } from "@/components/ui/SubmitButton";
 import { EvaluatorBadge } from "@/components/ui/EvaluatorBadge";
 import {
@@ -18,6 +20,7 @@ import {
   MessageSquare,
   AlertCircle,
   AlertTriangle,
+  Save,
 } from "lucide-react";
 import { type DepartmentData, isDeptAllowSkip } from "@/lib/formData";
 
@@ -294,10 +297,27 @@ export function Form3({
     register,
     handleSubmit,
     watch,
+    setValue,
+    getValues,
     formState: { errors },
   } = useForm<Form3Values>();
 
   const formValues = watch();
+
+  // Auto-save draft to localStorage
+  const onDraftRestored = useCallback(() => {
+    toast.success("โหลดข้อมูลที่เคยกรอกค้างไว้แล้ว", { icon: "📋", duration: 4000 });
+  }, []);
+
+  const { lastSavedAt, clearDraft, isSaving } = useDraftAutoSave<Form3Values>({
+    formId: "form_3",
+    batchId,
+    userId,
+    getValues,
+    setValue,
+    watchedValues: formValues,
+    onDraftRestored,
+  });
 
   // Calculate total staff & total completed
   const { totalStaffCount, filledFeedbackCount, percent } = useMemo(() => {
@@ -343,19 +363,22 @@ export function Form3({
     if (!user) return;
     setSubmitting(true);
     try {
-      await submitFormResponse({
-        formId: "form_3",
-        userId,
-        userEmail: user.email ?? "",
-        evaluatorName: user.displayName ?? "",
-        answers: data,
-        batchId,
+      await submitWithRetry(async () => {
+        await submitFormResponse({
+          formId: "form_3",
+          userId,
+          userEmail: user.email ?? "",
+          evaluatorName: user.displayName ?? "",
+          answers: data,
+          batchId,
+        });
+        await markFormComplete(userId, "form_3", batchId);
       });
-      await markFormComplete(userId, "form_3", batchId);
+      clearDraft();
       toast.success("ส่งแบบประเมินสำเร็จ!");
       router.replace("/hub");
-    } catch {
-      toast.error("เกิดข้อผิดพลาด กรุณาลองใหม่");
+    } catch (err) {
+      toast.error(getSubmitErrorMessage(err), { duration: 6000 });
     } finally {
       setSubmitting(false);
     }
@@ -430,6 +453,15 @@ export function Form3({
             style={{ width: `${percent}%` }}
           />
         </div>
+        {/* Draft auto-save indicator */}
+        {lastSavedAt && (
+          <div className="mt-2 flex items-center gap-1.5 text-[11px] text-slate-400">
+            <Save className="w-3 h-3" />
+            <span>
+              {isSaving ? "กำลังบันทึกร่าง..." : `บันทึกร่างอัตโนมัติเมื่อ ${new Date(lastSavedAt).toLocaleTimeString("th-TH")}`}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Controls: Search & Expand/Collapse */}
