@@ -77,12 +77,14 @@ export function submissionsToCsv(subs: StoredSubmission[], formId?: FormId, conf
     "evaluatorName", 
     "userEmail", 
     "submittedAt", 
+    "editCount",
     ...answerKeys.map(k => getHeaderLabel(k, formId, config))
   ];
   const rows = subs.map((s) => [
     s.evaluatorName,
     s.userEmail,
     s.submittedAt,
+    s.editCount ?? 0,
     ...answerKeys.map((k) => s.answers[k] ?? ""),
   ]);
 
