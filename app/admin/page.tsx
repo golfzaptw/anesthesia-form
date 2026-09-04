@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
-import { getAllSubmissions, getAllUsers, getFormConfig, deleteUser, saveFormConfig, createNewBatch } from "@/lib/firestore";
+import { getAllSubmissions, getAllUsers, getFormConfig, deleteUser, saveFormConfig, createNewBatch, migrateSubmissionIds } from "@/lib/firestore";
 import { isAdmin, HAS_ADMINS } from "@/lib/admin";
 import { getFormsMeta, type FormConfig } from "@/lib/formData";
 import {
@@ -37,6 +37,8 @@ import {
   ChevronDown,
   Plus,
   Layers,
+  Pencil,
+  DatabaseZap,
 } from "lucide-react";
 import type { FormId, StoredSubmission, UserSummary } from "@/types";
 import toast from "react-hot-toast";
@@ -61,6 +63,7 @@ export default function AdminPage() {
   const [showBatchDropdown, setShowBatchDropdown] = useState(false);
   const [showNewBatchModal, setShowNewBatchModal] = useState(false);
   const [isCreatingBatch, setIsCreatingBatch] = useState(false);
+  const [isMigrating, setIsMigrating] = useState(false);
 
   const allowed = !HAS_ADMINS || isAdmin(user?.email);
 
@@ -267,6 +270,21 @@ export default function AdminPage() {
     const subs = byForm[formId];
     if (!subs.length || !config) return;
     downloadCsv(`${formId}_batch${activeBatch}_submissions.csv`, submissionsToCsv(subs, formId, config));
+  };
+
+  const handleMigrateSubmissions = async () => {
+    setIsMigrating(true);
+    try {
+      const { migrated, skipped } = await migrateSubmissionIds();
+      const subs = await getAllSubmissions(activeBatch);
+      setSubmissions(subs);
+      toast.success(`ย้ายข้อมูลเก่าสำเร็จ — ย้ายแล้ว ${migrated} รายการ, ข้าม ${skipped} รายการ`);
+    } catch (err) {
+      console.error("Submission migration failed:", err);
+      toast.error("ย้ายข้อมูลไม่สำเร็จ — กรุณาตรวจสอบ Firestore Rules");
+    } finally {
+      setIsMigrating(false);
+    }
   };
 
   const handleDeleteUser = async () => {
@@ -571,10 +589,21 @@ export default function AdminPage() {
             </div>
 
             <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-              <div className="px-4 py-3 border-b border-gray-100">
+              <div className="px-4 py-3 border-b border-gray-100 flex flex-wrap items-center justify-between gap-2">
                 <h2 className="font-semibold text-sm text-gray-800">
                   สถานะรายบุคคล ({batchUsers.length})
                 </h2>
+                {isViewingCurrentBatch && (
+                  <button
+                    onClick={handleMigrateSubmissions}
+                    disabled={isMigrating}
+                    title="ย้ายคำตอบเก่ามาใช้รหัสอ้างอิงแบบใหม่ เพื่อให้ผู้ประเมินแก้ไขได้ 1 ครั้ง"
+                    className="inline-flex items-center gap-1.5 text-xs font-semibold text-gray-600 hover:text-blue-600 bg-gray-100 hover:bg-blue-50 border border-gray-200 hover:border-blue-200 px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <DatabaseZap className="w-3.5 h-3.5" />
+                    {isMigrating ? "กำลังย้ายข้อมูล..." : "ย้ายข้อมูลเก่าให้แก้ไขได้"}
+                  </button>
+                )}
               </div>
               {batchUsers.length === 0 ? (
                 <p className="text-sm text-gray-400 px-4 py-6 text-center">
@@ -602,13 +631,24 @@ export default function AdminPage() {
                             <p className="text-[11px] text-gray-400">{u.email}</p>
                           </td>
                           {formsMeta.map((f) => {
-                            const isCompleted = byForm[f.id].some(
+                            const submission = byForm[f.id].find(
                               (s) => s.userId === u.uid || (u.email && s.userEmail === u.email)
                             );
                             return (
                               <td key={f.id} className="text-center px-2 py-2">
-                                {isCompleted ? (
-                                  <span className="text-green-600 font-bold">✓</span>
+                                {submission ? (
+                                  <span className="inline-flex items-center gap-1 justify-center">
+                                    <span className="text-green-600 font-bold">✓</span>
+                                    {(submission.editCount ?? 0) >= 1 && (
+                                      <span
+                                        title="ผู้ประเมินได้แก้ไขคำตอบชุดนี้แล้ว"
+                                        className="inline-flex items-center gap-0.5 text-[10px] font-bold text-amber-700 bg-amber-100 border border-amber-200 rounded px-1 py-0.5"
+                                      >
+                                        <Pencil className="w-2.5 h-2.5" />
+                                        แก้ไขแล้ว
+                                      </span>
+                                    )}
+                                  </span>
                                 ) : (
                                   <span className="text-gray-300">—</span>
                                 )}
