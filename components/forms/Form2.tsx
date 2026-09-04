@@ -12,6 +12,7 @@ import { TextAreaInput } from "@/components/ui/TextAreaInput";
 import { ScaleInput } from "@/components/ui/ScaleInput";
 import { SubmitButton } from "@/components/ui/SubmitButton";
 import { EvaluatorBadge } from "@/components/ui/EvaluatorBadge";
+import { EditModeBanner } from "@/components/ui/EditModeBanner";
 import {
   ChevronDown,
   ChevronUp,
@@ -256,12 +257,16 @@ export function Form2({
   questions,
   preview,
   batchId,
+  isEditing,
+  existingAnswers,
 }: {
   userId: string;
   instructors: string[];
   questions: string[];
   preview?: boolean;
   batchId?: number;
+  isEditing?: boolean;
+  existingAnswers?: Record<string, unknown> | null;
 }) {
   const router = useRouter();
   const { user } = useAuth();
@@ -285,7 +290,9 @@ export function Form2({
     setValue,
     getValues,
     formState: { errors },
-  } = useForm<Form2Values>();
+  } = useForm<Form2Values>({
+    defaultValues: (existingAnswers ?? undefined) as Form2Values | undefined,
+  });
 
   const formValues = watch();
 
@@ -351,18 +358,21 @@ export function Form2({
     setSubmitting(true);
     try {
       await submitWithRetry(async () => {
-        await submitFormResponse({
-          formId: "form_2",
-          userId,
-          userEmail: user.email ?? "",
-          evaluatorName: user.displayName ?? "",
-          answers: data,
-          batchId,
-        });
+        await submitFormResponse(
+          {
+            formId: "form_2",
+            userId,
+            userEmail: user.email ?? "",
+            evaluatorName: user.displayName ?? "",
+            answers: data,
+            batchId,
+          },
+          isEditing
+        );
         await markFormComplete(userId, "form_2", batchId);
       });
       clearDraft();
-      toast.success("ส่งแบบประเมินสำเร็จ!");
+      toast.success(isEditing ? "แก้ไขแบบประเมินสำเร็จ!" : "ส่งแบบประเมินสำเร็จ!");
       router.replace("/hub");
     } catch (err) {
       toast.error(getSubmitErrorMessage(err), { duration: 6000 });
@@ -396,6 +406,8 @@ export function Form2({
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-6">
+      {isEditing && <EditModeBanner />}
+
       {/* Hero Header */}
       <div className="relative overflow-hidden bg-gradient-to-br from-purple-800 via-purple-900 to-slate-950 text-white rounded-3xl p-6 sm:p-8 shadow-lg shadow-purple-950/20">
         <div className="relative z-10">
@@ -592,7 +604,9 @@ export function Form2({
           <SubmitButton
             loading={submitting}
             label={
-              percent === 100
+              isEditing
+                ? `ส่งแบบประเมิน (แก้ไข) — ${completedInstructors}/${totalInstructors} ท่าน`
+                : percent === 100
                 ? "ส่งแบบประเมินอาจารย์ทั้งหมด"
                 : `ส่งแบบประเมิน (${completedInstructors}/${totalInstructors} ท่าน)`
             }

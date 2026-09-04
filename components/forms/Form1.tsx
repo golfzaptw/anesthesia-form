@@ -12,6 +12,7 @@ import { TextAreaInput } from "@/components/ui/TextAreaInput";
 import { ScaleInput } from "@/components/ui/ScaleInput";
 import { SubmitButton } from "@/components/ui/SubmitButton";
 import { EvaluatorBadge } from "@/components/ui/EvaluatorBadge";
+import { EditModeBanner } from "@/components/ui/EditModeBanner";
 import { BookOpen, CheckCircle2, AlertCircle, HelpCircle, Save } from "lucide-react";
 
 type Form1Values = Record<string, string>;
@@ -21,11 +22,15 @@ export function Form1({
   questions,
   preview,
   batchId,
+  isEditing,
+  existingAnswers,
 }: {
   userId: string;
   questions: string[];
   preview?: boolean;
   batchId?: number;
+  isEditing?: boolean;
+  existingAnswers?: Record<string, unknown> | null;
 }) {
   const router = useRouter();
   const { user } = useAuth();
@@ -39,7 +44,9 @@ export function Form1({
     setValue,
     getValues,
     formState: { errors },
-  } = useForm<Form1Values>();
+  } = useForm<Form1Values>({
+    defaultValues: (existingAnswers ?? undefined) as Form1Values | undefined,
+  });
 
   const formValues = watch();
 
@@ -95,18 +102,21 @@ export function Form1({
     setSubmitting(true);
     try {
       await submitWithRetry(async () => {
-        await submitFormResponse({
-          formId: "form_1",
-          userId,
-          userEmail: user.email ?? "",
-          evaluatorName: user.displayName ?? "",
-          answers: data as unknown as Record<string, unknown>,
-          batchId,
-        });
+        await submitFormResponse(
+          {
+            formId: "form_1",
+            userId,
+            userEmail: user.email ?? "",
+            evaluatorName: user.displayName ?? "",
+            answers: data as unknown as Record<string, unknown>,
+            batchId,
+          },
+          isEditing
+        );
         await markFormComplete(userId, "form_1", batchId);
       });
       clearDraft();
-      toast.success("ส่งแบบประเมินสำเร็จ!");
+      toast.success(isEditing ? "แก้ไขแบบประเมินสำเร็จ!" : "ส่งแบบประเมินสำเร็จ!");
       router.replace("/hub");
     } catch (err) {
       toast.error(getSubmitErrorMessage(err), { duration: 6000 });
@@ -117,6 +127,8 @@ export function Form1({
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-6">
+      {isEditing && <EditModeBanner />}
+
       {/* Hero Header Banner */}
       <div className="relative overflow-hidden bg-gradient-to-br from-blue-700 via-indigo-700 to-blue-900 text-white rounded-2xl sm:rounded-3xl p-4 sm:p-8 shadow-lg shadow-blue-900/10">
         <div className="relative z-10">
@@ -270,7 +282,15 @@ export function Form1({
           </div>
           <SubmitButton
             loading={submitting}
-            label={progressPercent === 100 ? "ส่งแบบประเมิน" : `ส่งแบบประเมิน (${answeredCount}/${totalCount} ข้อ)`}
+            label={
+              isEditing
+                ? progressPercent === 100
+                  ? "ส่งแบบประเมิน (แก้ไข)"
+                  : `ส่งแบบประเมิน (แก้ไข) — ${answeredCount}/${totalCount} ข้อ`
+                : progressPercent === 100
+                ? "ส่งแบบประเมิน"
+                : `ส่งแบบประเมิน (${answeredCount}/${totalCount} ข้อ)`
+            }
           />
         </div>
       </div>
