@@ -6,7 +6,6 @@ import {
   where,
   orderBy,
   setDoc,
-  addDoc,
   deleteDoc,
   collection,
   updateDoc,
@@ -25,6 +24,9 @@ import {
   mockGetFormConfig,
   mockSaveFormConfig,
   mockCreateNewBatch,
+  mockGetEditCount,
+  mockGetExistingSubmission,
+  mockMigrateSubmissionIds,
 } from "./mockStore";
 import type {
   BatchMeta,
@@ -103,14 +105,101 @@ export async function getCompletedForms(uid: string, batchId?: number): Promise<
   return (data as UserDoc).completedForms ?? [];
 }
 
+/** Deterministic submission id so a user can overwrite their own submission when editing. */
+export function submissionDocId(userId: string, formId: FormId, batchId?: number): string {
+  return `${userId}_${formId}_${batchId ?? 42}`;
+}
+
 export async function submitFormResponse(
-  payload: Omit<FormSubmission, "submittedAt">
+  payload: Omit<FormSubmission, "submittedAt">,
+  isEdit?: boolean
 ): Promise<void> {
-  if (IS_MOCK) return mockSubmitFormResponse(payload);
-  await addDoc(collection(db, "form_submissions"), {
+  if (IS_MOCK) return mockSubmitFormResponse(payload, isEdit);
+  const docId = submissionDocId(payload.userId, payload.formId, payload.batchId);
+  await setDoc(doc(db, "form_submissions", docId), {
     ...payload,
     submittedAt: serverTimestamp(),
+    editCount: isEdit ? 1 : 0,
   });
+}
+
+/** Returns the stored editCount, or -1 when no readable submission exists (i.e. not editable). */
+export async function getEditCount(
+  userId: string,
+  formId: FormId,
+  batchId?: number
+): Promise<number> {
+  if (IS_MOCK) return mockGetEditCount(userId, formId, batchId);
+  try {
+    const snap = await getDoc(doc(db, "form_submissions", submissionDocId(userId, formId, batchId)));
+    if (!snap.exists()) return -1;
+    return (snap.data().editCount as number) ?? 0;
+  } catch (err) {
+    console.warn("Could not read submission editCount:", err);
+    return -1;
+  }
+}
+
+export async function getExistingSubmission(
+  userId: string,
+  formId: FormId,
+  batchId?: number
+): Promise<Record<string, unknown> | null> {
+  if (IS_MOCK) return mockGetExistingSubmission(userId, formId, batchId);
+  try {
+    const snap = await getDoc(doc(db, "form_submissions", submissionDocId(userId, formId, batchId)));
+    if (!snap.exists()) return null;
+    return (snap.data().answers as Record<string, unknown>) ?? null;
+  } catch (err) {
+    console.warn("Could not read existing submission:", err);
+    return null;
+  }
+}
+
+/**
+ * Moves legacy submissions (random `addDoc` ids) onto the deterministic id scheme
+ * so they become editable. Newest submission wins when duplicates exist.
+ */
+export async function migrateSubmissionIds(): Promise<{ migrated: number; skipped: number }> {
+  if (IS_MOCK) return mockMigrateSubmissionIds();
+
+  const snap = await getDocs(
+    query(collection(db, "form_submissions"), orderBy("submittedAt", "desc"))
+  );
+
+  let migrated = 0;
+  let skipped = 0;
+
+  for (const d of snap.docs) {
+    const data = d.data();
+    const userId = data.userId as string | undefined;
+    const formId = data.formId as FormId | undefined;
+
+    if (!userId || !formId) {
+      skipped += 1;
+      continue;
+    }
+
+    const targetId = submissionDocId(userId, formId, data.batchId as number | undefined);
+    if (d.id === targetId) {
+      skipped += 1;
+      continue;
+    }
+
+    const targetRef = doc(db, "form_submissions", targetId);
+    if ((await getDoc(targetRef)).exists()) {
+      // A newer submission already occupies the deterministic id — drop the stale duplicate.
+      await deleteDoc(d.ref);
+      skipped += 1;
+      continue;
+    }
+
+    await setDoc(targetRef, { ...data, editCount: (data.editCount as number) ?? 0 });
+    await deleteDoc(d.ref);
+    migrated += 1;
+  }
+
+  return { migrated, skipped };
 }
 
 export async function markFormComplete(
@@ -172,6 +261,7 @@ export async function getAllSubmissions(batchId?: number): Promise<StoredSubmiss
       submittedAt: toIso(data.submittedAt),
       answers: (data.answers as Record<string, unknown>) ?? {},
       batchId: (data.batchId as number) ?? 42,
+      editCount: (data.editCount as number) ?? 0,
     };
   });
 

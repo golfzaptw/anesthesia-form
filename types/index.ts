@@ -33,6 +33,8 @@ export interface FormSubmission {
   submittedAt: Timestamp;
   answers: Record<string, unknown>;
   batchId?: number;
+  /** 0 = ส่งครั้งแรก, 1 = แก้ไขแล้ว 1 ครั้ง (ล็อคถาวร) */
+  editCount?: number;
 }
 
 export interface FormCardMeta {
@@ -51,6 +53,7 @@ export interface StoredSubmission {
   submittedAt: string;
   answers: Record<string, unknown>;
   batchId?: number;
+  editCount?: number;
 }
 
 export interface UserSummary {

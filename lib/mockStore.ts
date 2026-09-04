@@ -206,14 +206,66 @@ export async function mockMarkFormComplete(uid: string, formId: FormId, batchId?
 }
 
 export async function mockSubmitFormResponse(
-  payload: Omit<FormSubmission, "submittedAt">
+  payload: Omit<FormSubmission, "submittedAt">,
+  isEdit?: boolean
 ): Promise<void> {
   await delay();
-  const all = read<unknown[]>(SUBMISSIONS_KEY, []);
-  write(SUBMISSIONS_KEY, [
-    ...all,
-    { ...payload, submittedAt: new Date().toISOString() },
-  ]);
+  const all = read<StoredSubmission[]>(SUBMISSIONS_KEY, []);
+  const record = {
+    ...payload,
+    submittedAt: new Date().toISOString(),
+    editCount: isEdit ? 1 : 0,
+  } as StoredSubmission;
+
+  const index = all.findIndex((s) => isSameSubmission(s, payload.userId, payload.formId, payload.batchId));
+  if (index >= 0) {
+    all[index] = record;
+    write(SUBMISSIONS_KEY, all);
+    return;
+  }
+
+  write(SUBMISSIONS_KEY, [...all, record]);
+}
+
+function isSameSubmission(
+  s: StoredSubmission,
+  userId: string,
+  formId: FormId,
+  batchId?: number
+): boolean {
+  return s.userId === userId && s.formId === formId && (s.batchId ?? 42) === (batchId ?? 42);
+}
+
+export async function mockGetEditCount(
+  userId: string,
+  formId: FormId,
+  batchId?: number
+): Promise<number> {
+  await delay();
+  const found = read<StoredSubmission[]>(SUBMISSIONS_KEY, []).find((s) =>
+    isSameSubmission(s, userId, formId, batchId)
+  );
+  if (!found) return -1;
+  return found.editCount ?? 0;
+}
+
+export async function mockGetExistingSubmission(
+  userId: string,
+  formId: FormId,
+  batchId?: number
+): Promise<Record<string, unknown> | null> {
+  await delay();
+  const found = read<StoredSubmission[]>(SUBMISSIONS_KEY, []).find((s) =>
+    isSameSubmission(s, userId, formId, batchId)
+  );
+  return found?.answers ?? null;
+}
+
+/** Mock store already keys submissions by user/form/batch, so there is nothing to move. */
+export async function mockMigrateSubmissionIds(): Promise<{ migrated: number; skipped: number }> {
+  await delay();
+  const all = read<StoredSubmission[]>(SUBMISSIONS_KEY, []);
+  return { migrated: 0, skipped: all.length };
 }
 
 export async function mockGetAllSubmissions(batchId?: number): Promise<StoredSubmission[]> {
