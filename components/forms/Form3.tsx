@@ -10,6 +10,7 @@ import { useDraftAutoSave } from "@/lib/useDraftAutoSave";
 import { submitWithRetry, getSubmitErrorMessage } from "@/lib/submitWithRetry";
 import { SubmitButton } from "@/components/ui/SubmitButton";
 import { EvaluatorBadge } from "@/components/ui/EvaluatorBadge";
+import { EditModeBanner } from "@/components/ui/EditModeBanner";
 import {
   ChevronDown,
   ChevronUp,
@@ -279,11 +280,15 @@ export function Form3({
   departments,
   preview,
   batchId,
+  isEditing,
+  existingAnswers,
 }: {
   userId: string;
   departments: DepartmentData[];
   preview?: boolean;
   batchId?: number;
+  isEditing?: boolean;
+  existingAnswers?: Record<string, unknown> | null;
 }) {
   const router = useRouter();
   const { user } = useAuth();
@@ -298,9 +303,12 @@ export function Form3({
     handleSubmit,
     watch,
     setValue,
+    setError,
     getValues,
     formState: { errors },
-  } = useForm<Form3Values>();
+  } = useForm<Form3Values>({
+    defaultValues: (existingAnswers ?? undefined) as Form3Values | undefined,
+  });
 
   const formValues = watch();
 
@@ -355,7 +363,59 @@ export function Form3({
     setOpenDepts(next);
   };
 
+  const revealDepts = (deptIndices: number[]) => {
+    setOpenDepts((prev) => {
+      const next = { ...prev };
+      deptIndices.forEach((di) => {
+        next[di] = true;
+      });
+      return next;
+    });
+  };
+
+  // Inputs inside collapsed accordions are never registered, so react-hook-form cannot validate them.
+  const findMissingFields = (values: Form3Values) => {
+    const missing: { deptIndex: number; key: string; message: string }[] = [];
+
+    departments.forEach((d, di) => {
+      const allowSkip = isDeptAllowSkip(d);
+      d.staff.forEach((_, si) => {
+        const fieldKey = `d${di}_s${si}`;
+        const metKey = `${fieldKey}_met`;
+
+        if (allowSkip) {
+          const metVal = values[metKey];
+          if (!metVal) {
+            missing.push({ deptIndex: di, key: metKey, message: "กรุณาเลือก" });
+            return;
+          }
+          if (metVal === "ไม่เคย") return;
+        }
+
+        const val = values[fieldKey];
+        if (!val || val.trim().length === 0) {
+          missing.push({
+            deptIndex: di,
+            key: fieldKey,
+            message: "กรุณาระบุข้อคิดเห็น/ข้อเสนอแนะสำหรับท่านนี้",
+          });
+        }
+      });
+    });
+
+    return missing;
+  };
+
   const onSubmit = async (data: Form3Values) => {
+    const missing = findMissingFields(data);
+    if (missing.length > 0) {
+      missing.forEach((m) => setError(m.key, { type: "required", message: m.message }));
+      setSearchTerm("");
+      revealDepts(missing.map((m) => m.deptIndex));
+      toast.error(`ยังกรอกข้อมูลไม่ครบ อีก ${missing.length} รายการ`, { duration: 6000 });
+      return;
+    }
+
     if (preview) {
       toast.success("นี่คือโหมด Preview (ไม่มีการบันทึกข้อมูลจริง)");
       return;
@@ -364,18 +424,21 @@ export function Form3({
     setSubmitting(true);
     try {
       await submitWithRetry(async () => {
-        await submitFormResponse({
-          formId: "form_3",
-          userId,
-          userEmail: user.email ?? "",
-          evaluatorName: user.displayName ?? "",
-          answers: data,
-          batchId,
-        });
+        await submitFormResponse(
+          {
+            formId: "form_3",
+            userId,
+            userEmail: user.email ?? "",
+            evaluatorName: user.displayName ?? "",
+            answers: data,
+            batchId,
+          },
+          isEditing
+        );
         await markFormComplete(userId, "form_3", batchId);
       });
       clearDraft();
-      toast.success("ส่งแบบประเมินสำเร็จ!");
+      toast.success(isEditing ? "แก้ไขแบบประเมินสำเร็จ!" : "ส่งแบบประเมินสำเร็จ!");
       router.replace("/hub");
     } catch (err) {
       toast.error(getSubmitErrorMessage(err), { duration: 6000 });
@@ -386,24 +449,25 @@ export function Form3({
 
   const onError = (formErrors: FieldErrors<Form3Values>) => {
     // Automatically open departments that have errors so user sees what is missing
-    const nextOpen = { ...openDepts };
-    let firstErrorDept = -1;
+    const errorDepts: number[] = [];
 
     departments.forEach((d, di) => {
       d.staff.forEach((_, si) => {
         if (formErrors[`d${di}_s${si}`] || formErrors[`d${di}_s${si}_met`]) {
-          nextOpen[di] = true;
-          if (firstErrorDept === -1) firstErrorDept = di;
+          if (!errorDepts.includes(di)) errorDepts.push(di);
         }
       });
     });
 
-    setOpenDepts(nextOpen);
+    setSearchTerm("");
+    revealDepts(errorDepts);
     toast.error("กรุณาเลือก เคย/ไม่เคย และกรอกข้อเสนอแนะให้ครบทุกท่านที่เคยเจอ");
   };
 
   return (
     <form onSubmit={handleSubmit(onSubmit, onError)} noValidate className="space-y-6">
+      {isEditing && <EditModeBanner />}
+
       {/* Hero Header */}
       <div className="relative overflow-hidden bg-gradient-to-br from-teal-800 via-teal-900 to-slate-900 text-white rounded-3xl p-6 sm:p-8 shadow-lg shadow-teal-950/20">
         <div className="relative z-10">
@@ -534,7 +598,9 @@ export function Form3({
           <SubmitButton
             loading={submitting}
             label={
-              percent === 100
+              isEditing
+                ? `ส่งแบบประเมิน (แก้ไข) — ${filledFeedbackCount}/${totalStaffCount} ท่าน`
+                : percent === 100
                 ? "ส่งแบบประเมินพยาบาลวิสัญญีทั้งหมด"
                 : `ส่งแบบประเมิน (${filledFeedbackCount}/${totalStaffCount} ท่าน)`
             }
