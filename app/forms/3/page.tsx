@@ -16,9 +16,6 @@ export default function Form3Page() {
 
   useEffect(() => {
     if (loading || !user) return;
-    getCompletedForms(user.uid).then((completed) => {
-      if (completed.includes("form_3")) router.replace("/hub");
-    });
     getFormConfig().then((conf) => {
       const now = Date.now();
       const startMs = conf.startDate ? new Date(conf.startDate).getTime() : 0;
@@ -34,6 +31,7 @@ export default function Form3Page() {
       }
       setConfig(conf);
 
+      // Batch-aware check only
       getCompletedForms(user.uid, conf.currentBatch).then((batchCompleted) => {
         if (batchCompleted.includes("form_3")) router.replace("/hub");
       });

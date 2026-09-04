@@ -16,10 +16,6 @@ export default function Form1Page() {
 
   useEffect(() => {
     if (loading || !user) return;
-    // Guard: redirect if already submitted
-    getCompletedForms(user.uid).then((completed) => {
-      if (completed.includes("form_1")) router.replace("/hub");
-    });
     getFormConfig().then((conf) => {
       const now = Date.now();
       const startMs = conf.startDate ? new Date(conf.startDate).getTime() : 0;
@@ -35,7 +31,7 @@ export default function Form1Page() {
       }
       setConfig(conf);
 
-      // Re-check with batch-aware completedForms
+      // Batch-aware check only
       getCompletedForms(user.uid, conf.currentBatch).then((batchCompleted) => {
         if (batchCompleted.includes("form_1")) router.replace("/hub");
       });
