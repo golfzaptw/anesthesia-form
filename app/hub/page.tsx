@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
-import { getCompletedForms, getFormConfig } from "@/lib/firestore";
+import { getCompletedForms, getFormConfig, getEditCount } from "@/lib/firestore";
 import { FormCard } from "@/components/ui/FormCard";
 import { LogOut, Stethoscope, FlaskConical, RotateCcw, BarChart3, Clock, AlertTriangle } from "lucide-react";
 import { IS_MOCK } from "@/lib/mockMode";
@@ -19,6 +19,7 @@ export default function HubPage() {
   const { user, loading, signOut } = useAuth();
   const router = useRouter();
   const [completedForms, setCompletedForms] = useState<FormId[]>([]);
+  const [editCounts, setEditCounts] = useState<Partial<Record<FormId, number>>>({});
   const [config, setConfig] = useState<FormConfig | null>(null);
   const [fetchingStatus, setFetchingStatus] = useState(true);
   const [formsMeta, setFormsMeta] = useState<FormCardMeta[]>([]);
@@ -40,10 +41,20 @@ export default function HubPage() {
         setConfig(conf);
         setFormsMeta(getFormsMeta(conf.currentBatch));
         // Use batch-aware completedForms
-        return getCompletedForms(user.uid, conf.currentBatch);
+        return getCompletedForms(user.uid, conf.currentBatch).then(
+          (forms) => [conf, forms] as const
+        );
       })
-      .then((forms) => {
+      .then(async ([conf, forms]) => {
         setCompletedForms(forms);
+        const counts = await Promise.all(
+          forms.map((formId) => getEditCount(user.uid, formId, conf.currentBatch))
+        );
+        setEditCounts(
+          Object.fromEntries(forms.map((formId, i) => [formId, counts[i]])) as Partial<
+            Record<FormId, number>
+          >
+        );
       })
       .finally(() => setFetchingStatus(false));
   }, [user]);
@@ -252,6 +263,7 @@ export default function HubPage() {
               key={form.id}
               {...form}
               completed={completedForms.includes(form.id)}
+              editsRemaining={editCounts[form.id] === 0 ? 1 : 0}
               disabled={isDisabled}
               disabledMessage={disabledMessage}
             />

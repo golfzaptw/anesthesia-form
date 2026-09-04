@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { CheckCircle2, BookOpen, GraduationCap, Users2, ArrowRight, Lock } from "lucide-react";
+import { CheckCircle2, BookOpen, GraduationCap, Users2, ArrowRight, Lock, Pencil } from "lucide-react";
 import type { FormId } from "@/types";
 
 interface FormCardProps {
@@ -8,11 +8,15 @@ interface FormCardProps {
   description: string;
   href: string;
   completed: boolean;
+  /** How many edits are still allowed for an already-submitted form. */
+  editsRemaining?: number;
   disabled?: boolean;
   disabledMessage?: string;
 }
 
-export function FormCard({ id, title, description, href, completed, disabled, disabledMessage }: FormCardProps) {
+export function FormCard({ id, title, description, href, completed, editsRemaining = 0, disabled, disabledMessage }: FormCardProps) {
+  const canEdit = completed && !disabled && editsRemaining > 0;
+
   // Select icon & color themes per form
   const theme = {
     form_1: {
@@ -53,7 +57,9 @@ export function FormCard({ id, title, description, href, completed, disabled, di
   return (
     <div
       className={`group relative overflow-hidden rounded-2xl border transition-all duration-300 p-6 flex flex-col justify-between gap-5 ${
-        completed
+        canEdit
+          ? "border-amber-200 bg-gradient-to-br from-amber-50/60 via-white to-amber-50/30 shadow-sm"
+          : completed
           ? "border-emerald-200 bg-gradient-to-br from-emerald-50/50 via-white to-emerald-50/30 shadow-sm"
           : disabled
           ? "border-slate-200 bg-slate-50/70 opacity-80"
@@ -76,10 +82,17 @@ export function FormCard({ id, title, description, href, completed, disabled, di
           </div>
 
           {completed ? (
-            <span className="inline-flex items-center gap-1.5 bg-emerald-100 text-emerald-800 text-xs font-bold px-3 py-1.5 rounded-full border border-emerald-200 shrink-0 shadow-sm">
-              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-              เสร็จสิ้นแล้ว
-            </span>
+            canEdit ? (
+              <span className="inline-flex items-center gap-1.5 bg-amber-100 text-amber-800 text-xs font-bold px-3 py-1.5 rounded-full border border-amber-200 shrink-0 shadow-sm">
+                <Pencil className="w-3.5 h-3.5 text-amber-600" />
+                ส่งแล้ว • แก้ไขได้อีก {editsRemaining} ครั้ง
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1.5 bg-emerald-100 text-emerald-800 text-xs font-bold px-3 py-1.5 rounded-full border border-emerald-200 shrink-0 shadow-sm">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                เสร็จสิ้นแล้ว
+              </span>
+            )
           ) : disabled ? (
             <span className="inline-flex items-center gap-1 bg-slate-100 text-slate-500 text-xs font-medium px-2.5 py-1 rounded-full border border-slate-200 shrink-0">
               <Lock className="w-3.5 h-3.5" />
@@ -101,10 +114,20 @@ export function FormCard({ id, title, description, href, completed, disabled, di
 
       <div>
         {completed ? (
-          <div className="w-full py-3 rounded-xl text-sm font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 text-center flex items-center justify-center gap-2">
-            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-            คุณส่งแบบประเมินชุดนี้เรียบร้อยแล้ว
-          </div>
+          canEdit ? (
+            <Link
+              href={href}
+              className="w-full py-3 rounded-xl text-sm font-bold text-center flex items-center justify-center gap-2 transition-all duration-200 shadow-md bg-amber-500 hover:bg-amber-600 text-white shadow-amber-500/20 group-hover:translate-y-[-1px]"
+            >
+              <Pencil className="w-4 h-4" />
+              <span>แก้ไขแบบประเมิน</span>
+            </Link>
+          ) : (
+            <div className="w-full py-3 rounded-xl text-sm font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 text-center flex items-center justify-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+              คุณส่งแบบประเมินชุดนี้เรียบร้อยแล้ว
+            </div>
+          )
         ) : disabled ? (
           <button
             disabled
