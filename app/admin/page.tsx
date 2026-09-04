@@ -161,7 +161,7 @@ export default function AdminPage() {
   // A user belongs to the active batch if they submitted a form in this batch,
   // OR if their registered batches includes the active batch.
   const batchUsers = useMemo(() => {
-    return users.filter((u) => {
+    const filtered = users.filter((u) => {
       // 1. Did the user submit anything in this batch?
       const hasSubmittedInBatch = submissions.some(
         (s) => s.userId === u.uid || (u.email && s.userEmail === u.email)
@@ -171,6 +171,12 @@ export default function AdminPage() {
       // 2. Was the user registered in this batch?
       const userBatches = u.batches ?? (u.batchId ? [u.batchId] : [42]);
       return userBatches.includes(activeBatch);
+    });
+
+    return filtered.sort((a, b) => {
+      const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return dateA - dateB;
     });
   }, [users, submissions, activeBatch]);
 
@@ -614,7 +620,9 @@ export default function AdminPage() {
                   <table className="w-full text-xs sm:text-sm min-w-[480px]">
                     <thead className="bg-gray-50 text-gray-500">
                       <tr>
+                        <th className="text-left font-medium px-4 py-2 w-12">ลำดับ</th>
                         <th className="text-left font-medium px-4 py-2">ชื่อผู้ประเมิน</th>
+                        <th className="text-left font-medium px-4 py-2">วันที่ลงทะเบียน</th>
                         <th className="text-center font-medium px-2 py-2">ชุด 1</th>
                         <th className="text-center font-medium px-2 py-2">ชุด 2</th>
                         <th className="text-center font-medium px-2 py-2">ชุด 3</th>
@@ -624,11 +632,23 @@ export default function AdminPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {batchUsers.map((u) => (
+                      {batchUsers.map((u, index) => (
                         <tr key={u.uid} className="border-t border-gray-100">
+                          <td className="px-4 py-2 text-gray-500 text-sm">
+                            {index + 1}
+                          </td>
                           <td className="px-4 py-2">
                             <p className="font-medium text-gray-800">{u.displayName || "—"}</p>
                             <p className="text-[11px] text-gray-400">{u.email}</p>
+                          </td>
+                          <td className="px-4 py-2 text-gray-500 text-xs">
+                            {u.createdAt ? new Date(u.createdAt).toLocaleString("th-TH", {
+                              year: "2-digit",
+                              month: "short",
+                              day: "numeric",
+                              hour: "2-digit",
+                              minute: "2-digit"
+                            }) : "—"}
                           </td>
                           {formsMeta.map((f) => {
                             const submission = byForm[f.id].find(
