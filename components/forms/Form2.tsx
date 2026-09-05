@@ -288,6 +288,7 @@ export function Form2({
     handleSubmit,
     watch,
     setValue,
+    setError,
     getValues,
     formState: { errors },
   } = useForm<Form2Values>({
@@ -349,7 +350,56 @@ export function Form2({
     setOpenSections(next);
   };
 
+  const revealInstructors = (indices: number[]) => {
+    setOpenSections((prev) => {
+      const next = { ...prev };
+      indices.forEach((i) => {
+        next[i] = true;
+      });
+      return next;
+    });
+  };
+
+  // Inputs inside collapsed accordions are never registered, so react-hook-form cannot validate them.
+  const findMissingFields = (values: Form2Values) => {
+    const missing: { index: number; key: string; message: string }[] = [];
+
+    instructors.forEach((_, i) => {
+      const metKey = `i${i}_met`;
+      const metVal = values[metKey];
+
+      if (!metVal) {
+        missing.push({ index: i, key: metKey, message: "กรุณาเลือกสถานะ" });
+        return;
+      }
+
+      if (metVal === "ไม่เคย") return;
+
+      if (metVal === "เคย") {
+        questions.forEach((_, qi) => {
+          const qKey = `i${i}_q${qi + 1}`;
+          if (!values[qKey]) {
+            missing.push({ index: i, key: qKey, message: "กรุณาประเมินข้อนี้" });
+          }
+        });
+      }
+    });
+
+    return missing;
+  };
+
   const onSubmit = async (data: Form2Values) => {
+    const missing = findMissingFields(data);
+    if (missing.length > 0) {
+      missing.forEach((m) => setError(m.key, { type: "required", message: m.message }));
+      setSearchTerm("");
+      setFilterMode("all");
+      revealInstructors(missing.map((m) => m.index));
+      const uniqueInstructors = new Set(missing.map(m => m.index));
+      toast.error(`ยังกรอกข้อมูลไม่ครบ อีก ${uniqueInstructors.size} ท่าน`, { duration: 6000 });
+      return;
+    }
+
     if (preview) {
       toast.success("นี่คือโหมด Preview (ไม่มีการบันทึกข้อมูลจริง)");
       return;
@@ -381,6 +431,29 @@ export function Form2({
     }
   };
 
+  const onError = (formErrors: FieldErrors<Form2Values>) => {
+    // Automatically open instructors that have errors so user sees what is missing
+    const errorIndices: number[] = [];
+
+    instructors.forEach((_, i) => {
+      const metKey = `i${i}_met`;
+      if (formErrors[metKey]) {
+        if (!errorIndices.includes(i)) errorIndices.push(i);
+      }
+      questions.forEach((_, qi) => {
+        const qKey = `i${i}_q${qi + 1}`;
+        if (formErrors[qKey]) {
+          if (!errorIndices.includes(i)) errorIndices.push(i);
+        }
+      });
+    });
+
+    setSearchTerm("");
+    setFilterMode("all");
+    revealInstructors(errorIndices);
+    toast.error("กรุณากรอกข้อมูลให้ครบทุกหัวข้อที่ยังค้างอยู่");
+  };
+
   // Filter instructors based on search & filter tabs
   const filteredInstructors = useMemo(() => {
     return instructors
@@ -405,7 +478,7 @@ export function Form2({
   }, [instructors, searchTerm, filterMode, formValues]);
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-6">
+    <form onSubmit={handleSubmit(onSubmit, onError)} noValidate className="space-y-6">
       {isEditing && <EditModeBanner />}
 
       {/* Hero Header */}
