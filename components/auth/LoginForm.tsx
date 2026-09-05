@@ -5,8 +5,9 @@ import { useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import toast from "react-hot-toast";
 import { useAuth } from "@/contexts/AuthContext";
-import { Stethoscope, Eye, EyeOff } from "lucide-react";
+import { Stethoscope, Eye, EyeOff, Download } from "lucide-react";
 import { isAdmin } from "@/lib/admin";
+import { downloadCredentialImage } from "@/lib/credentialImage";
 import { Footer } from "@/components/ui/Footer";
 
 interface FormValues {
@@ -25,15 +26,22 @@ export function LoginForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [generatedPassword, setGeneratedPassword] = useState<string | null>(null);
+  const [registeredName, setRegisteredName] = useState("");
+  const [countdown, setCountdown] = useState(0);
 
   const {
     register,
     handleSubmit,
-    getValues,
     formState: { errors },
   } = useForm<FormValues>();
 
   const isRegistering = useRef(false);
+
+  useEffect(() => {
+    if (!generatedPassword || countdown <= 0) return;
+    const timer = setTimeout(() => setCountdown((c) => c - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [generatedPassword, countdown]);
 
   useEffect(() => {
     if (!loading && user && !isRegistering.current && !generatedPassword) {
@@ -57,8 +65,11 @@ export function LoginForm() {
         toast.success("เข้าสู่ระบบผู้ดูแลสำเร็จ!");
       } else if (isEvaluatorNew) {
         isRegistering.current = true;
-        const pass = await registerAsGuest(displayName.trim());
+        const trimmedName = displayName.trim();
+        const pass = await registerAsGuest(trimmedName);
+        setRegisteredName(trimmedName);
         setGeneratedPassword(pass);
+        setCountdown(5);
         setSubmitting(false);
         return; // wait for user to acknowledge password
       } else {
@@ -103,13 +114,13 @@ export function LoginForm() {
           <div className="bg-white rounded-2xl shadow-xl p-5 sm:p-6 w-full max-w-sm border-t-4 border-blue-500">
             <h3 className="text-lg font-bold text-gray-800 mb-2">สร้างชื่อสำเร็จ!</h3>
             <p className="text-xs sm:text-sm text-gray-600 mb-4 leading-relaxed">
-              นี่คือชื่อและรหัสผ่านของคุณ กรุณา<strong>แคปหน้าจอ</strong> หรือจดบันทึกไว้ เพื่อใช้ล็อกอินกลับเข้ามาทำแบบประเมินต่อในครั้งหน้า
+              นี่คือชื่อและรหัสผ่านของคุณ กรุณา<strong>บันทึกเป็นรูปภาพ</strong> หรือจดบันทึกไว้ เพื่อใช้ล็อกอินกลับเข้ามาทำแบบประเมินต่อในครั้งหน้า
             </p>
-            <div className="bg-gray-50 rounded-xl border border-gray-200 p-4 mb-5 text-center space-y-3">
+            <div className="bg-gray-50 rounded-xl border border-gray-200 p-4 mb-4 text-center space-y-3">
               <div>
                 <p className="text-xs text-gray-500 font-medium mb-1">ชื่อผู้ประเมิน</p>
                 <span className="text-base sm:text-lg font-semibold text-gray-800">
-                  {getValues("displayName")}
+                  {registeredName}
                 </span>
               </div>
               <div className="pt-3 border-t border-gray-200">
@@ -120,14 +131,33 @@ export function LoginForm() {
               </div>
             </div>
             <button
+              type="button"
+              onClick={async () => {
+                try {
+                  await downloadCredentialImage(registeredName, generatedPassword);
+                  toast.success("บันทึกรูปภาพแล้ว");
+                } catch {
+                  toast.error("บันทึกรูปไม่สำเร็จ กรุณาแคปหน้าจอแทน");
+                }
+              }}
+              className="w-full mb-2 border-2 border-blue-500 text-blue-600 hover:bg-blue-50 font-semibold py-2.5 rounded-xl transition-colors flex items-center justify-center gap-2"
+            >
+              <Download className="w-4 h-4" />
+              บันทึกเป็นรูปภาพ
+            </button>
+            <button
               onClick={() => {
                 setGeneratedPassword(null);
                 proceedToApp();
               }}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 rounded-xl transition-colors shadow-sm"
+              disabled={countdown > 0}
+              className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-semibold py-2.5 rounded-xl transition-colors shadow-sm"
             >
-              รับทราบ แคปหน้าจอแล้ว
+              {countdown > 0 ? `กรุณาบันทึกข้อมูลก่อน (${countdown})` : "รับทราบ บันทึกข้อมูลแล้ว"}
             </button>
+            <p className="text-[11px] text-gray-400 text-center mt-2">
+              ระบบไม่ได้เก็บรหัสผ่านนี้ไว้ กรุณาเก็บรูปหรือจดไว้ด้วยตนเอง
+            </p>
           </div>
         ) : (
           <div className="w-full max-w-md bg-white rounded-2xl sm:rounded-3xl shadow-xl p-5 sm:p-8">
