@@ -7,6 +7,7 @@ interface CollapsibleProps {
   title: string;
   badge?: string;
   defaultOpen?: boolean;
+  action?: ReactNode;
   children: ReactNode;
 }
 
@@ -14,19 +15,21 @@ export function Collapsible({
   title,
   badge,
   defaultOpen = false,
+  action,
   children,
 }: CollapsibleProps) {
   const [open, setOpen] = useState(defaultOpen);
 
   return (
     <div className="rounded-xl border border-gray-200 overflow-hidden bg-white">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="w-full flex items-center justify-between gap-3 px-4 py-3 text-left hover:bg-gray-50 transition-colors"
-      >
+      <div className="w-full flex items-center justify-between gap-3 px-4 py-3 bg-white hover:bg-gray-50 transition-colors cursor-pointer" onClick={() => setOpen((v) => !v)}>
         <span className="font-semibold text-sm text-gray-800">{title}</span>
         <span className="flex items-center gap-2 shrink-0">
+          {action && (
+            <div onClick={(e) => e.stopPropagation()} className="print:hidden">
+              {action}
+            </div>
+          )}
           {badge && (
             <span className="text-xs font-medium text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
               {badge}
@@ -38,7 +41,7 @@ export function Collapsible({
             <ChevronDown className="w-4 h-4 text-gray-400" />
           )}
         </span>
-      </button>
+      </div>
       <div className={`${open ? "block" : "hidden print:block"} px-4 pb-4 border-t border-gray-100`}>
         {children}
       </div>
