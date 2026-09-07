@@ -1,10 +1,12 @@
-import type { AppUser, BatchMeta, FormId, FormSubmission, StoredSubmission, UserSummary } from "@/types";
-import { DEFAULT_FORM_CONFIG, type FormConfig } from "@/lib/formData";
+import type { AppUser, BatchConfigSnapshot, BatchMeta, FormId, FormSubmission, StoredSubmission, UserSummary, AdminAuditLog } from "@/types";
+import { DEFAULT_FORM_CONFIG, toBatchConfigSnapshot, type FormConfig } from "@/lib/formData";
 
 const USERS_KEY = "mock_users";
 const SESSION_KEY = "mock_session";
 const SUBMISSIONS_KEY = "mock_submissions";
 const CONFIG_KEY = "mock_form_config";
+const BATCH_SNAPSHOTS_KEY = "mock_batch_config_snapshots";
+const AUDIT_LOGS_KEY = "mock_admin_audit_logs";
 
 interface MockUserRecord {
   uid: string;
@@ -38,6 +40,17 @@ function write(key: string, value: unknown): void {
 
 function getUsers(): MockUserRecord[] {
   return read<MockUserRecord[]>(USERS_KEY, []);
+}
+
+function readSnapshots(): Record<string, BatchConfigSnapshot> {
+  return read<Record<string, BatchConfigSnapshot>>(BATCH_SNAPSHOTS_KEY, {});
+}
+
+function writeSnapshot(snapshot: BatchConfigSnapshot): void {
+  write(BATCH_SNAPSHOTS_KEY, {
+    ...readSnapshots(),
+    [String(snapshot.batchId)]: snapshot,
+  });
 }
 
 function notify(user: AppUser | null): void {
@@ -327,6 +340,22 @@ export async function mockGetFormConfig(): Promise<FormConfig> {
 export async function mockSaveFormConfig(config: FormConfig): Promise<void> {
   await delay();
   write(CONFIG_KEY, config);
+  writeSnapshot(toBatchConfigSnapshot(config.currentBatch, config));
+}
+
+export async function mockGetBatchConfigSnapshot(
+  batchId: number
+): Promise<BatchConfigSnapshot | null> {
+  await delay();
+  return readSnapshots()[String(batchId)] ?? null;
+}
+
+export async function mockSaveBatchConfigSnapshot(
+  batchId: number,
+  config: FormConfig
+): Promise<void> {
+  await delay();
+  writeSnapshot(toBatchConfigSnapshot(batchId, config));
 }
 
 export async function mockCreateNewBatch(
@@ -334,6 +363,9 @@ export async function mockCreateNewBatch(
   newBatchNumber: number
 ): Promise<FormConfig> {
   await delay();
+
+  // Freeze the outgoing batch before its wording can be edited for the new one.
+  writeSnapshot(toBatchConfigSnapshot(currentConfig.currentBatch, currentConfig));
 
   const newBatch: BatchMeta = {
     id: newBatchNumber,
@@ -357,14 +389,40 @@ export async function mockCreateNewBatch(
   };
 
   write(CONFIG_KEY, newConfig);
+  writeSnapshot(toBatchConfigSnapshot(newBatchNumber, newConfig));
   return newConfig;
 }
 
 /** Clears all mock data — handy for re-testing a form from scratch. */
 export function mockReset(): void {
   if (typeof window === "undefined") return;
-  [USERS_KEY, SESSION_KEY, SUBMISSIONS_KEY, CONFIG_KEY].forEach((k) =>
+  [USERS_KEY, SESSION_KEY, SUBMISSIONS_KEY, CONFIG_KEY, BATCH_SNAPSHOTS_KEY, AUDIT_LOGS_KEY].forEach((k) =>
     window.localStorage.removeItem(k)
   );
   notify(null);
+}
+
+export function mockLogAdminAction(
+  action: AdminAuditLog["action"],
+  actorEmail: string,
+  targetLabel: string,
+  detail: string,
+  batchId?: number
+): void {
+  const all = read<AdminAuditLog[]>(AUDIT_LOGS_KEY, []);
+  const log: AdminAuditLog = {
+    id: `audit_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+    action,
+    actorEmail,
+    targetLabel,
+    detail,
+    batchId,
+    at: new Date().toISOString(),
+  };
+  write(AUDIT_LOGS_KEY, [log, ...all]);
+}
+
+export function mockGetAuditLogs(limitCount = 50): AdminAuditLog[] {
+  const all = read<AdminAuditLog[]>(AUDIT_LOGS_KEY, []);
+  return all.slice(0, limitCount);
 }

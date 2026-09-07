@@ -11,6 +11,7 @@ import {
   updateDoc,
   serverTimestamp,
   Timestamp,
+  limit,
 } from "firebase/firestore";
 import { db } from "./firebase";
 import { IS_MOCK } from "./mockMode";
@@ -27,14 +28,20 @@ import {
   mockGetEditCount,
   mockGetExistingSubmission,
   mockMigrateSubmissionIds,
+  mockGetBatchConfigSnapshot,
+  mockSaveBatchConfigSnapshot,
+  mockGetAuditLogs,
+  mockLogAdminAction,
 } from "./mockStore";
 import type {
+  BatchConfigSnapshot,
   BatchMeta,
   FormId,
   FormSubmission,
   StoredSubmission,
   UserDoc,
   UserSummary,
+  AdminAuditLog,
 } from "@/types";
 import {
   FORM1_QUESTIONS,
@@ -44,6 +51,7 @@ import {
   DEFAULT_FORM_CONFIG,
   type FormConfig,
   isDeptAllowSkip,
+  toBatchConfigSnapshot,
 } from "./formData";
 
 export async function getOrCreateUserDoc(
@@ -160,7 +168,7 @@ export async function getExistingSubmission(
  * Moves legacy submissions (random `addDoc` ids) onto the deterministic id scheme
  * so they become editable. Newest submission wins when duplicates exist.
  */
-export async function migrateSubmissionIds(): Promise<{ migrated: number; skipped: number }> {
+export async function migrateSubmissionIds(actorEmail: string = "admin@example.com"): Promise<{ migrated: number; skipped: number }> {
   if (IS_MOCK) return mockMigrateSubmissionIds();
 
   const snap = await getDocs(
@@ -198,6 +206,13 @@ export async function migrateSubmissionIds(): Promise<{ migrated: number; skippe
     await deleteDoc(d.ref);
     migrated += 1;
   }
+
+  await logAdminAction(
+    "migration.run",
+    actorEmail,
+    "Migrate Submissions",
+    `ดำเนินการ Migrate: สำเร็จ ${migrated}, ข้าม ${skipped}`
+  );
 
   return { migrated, skipped };
 }
@@ -295,7 +310,7 @@ export function nameToSlug(name: string): string {
   return encodeURIComponent(name.trim().toLowerCase().replace(/\s+/g, "_"));
 }
 
-export async function deleteUser(uid: string, email?: string, displayName?: string): Promise<void> {
+export async function deleteUser(uid: string, email?: string, displayName?: string, actorEmail: string = "admin@example.com"): Promise<void> {
   if (IS_MOCK) return mockDeleteUser(uid, email);
 
   // 1. Delete user document from 'users'
@@ -334,6 +349,13 @@ export async function deleteUser(uid: string, email?: string, displayName?: stri
   } catch (subErr) {
     console.warn("Warning while deleting associated form_submissions:", subErr);
   }
+
+  await logAdminAction(
+    "user.delete",
+    actorEmail,
+    email || displayName || uid,
+    `ลบผู้ใช้: ${email || displayName || uid}`,
+  );
 }
 
 export { DEFAULT_FORM_CONFIG };
@@ -389,7 +411,7 @@ export async function getFormConfig(): Promise<FormConfig> {
   }
 }
 
-export async function saveFormConfig(config: FormConfig): Promise<void> {
+export async function saveFormConfig(config: FormConfig, actorEmail: string = "admin@example.com"): Promise<void> {
   if (IS_MOCK) return mockSaveFormConfig(config);
   const configRef = doc(db, "config", "formData");
   const cleanConfig: FormConfig = {
@@ -408,6 +430,81 @@ export async function saveFormConfig(config: FormConfig): Promise<void> {
     batches: config.batches || [],
   };
   await setDoc(configRef, cleanConfig);
+
+  // Keep the current batch's snapshot in step with the live config so the
+  // snapshot always reflects the latest wording that batch was shown.
+  try {
+    await saveBatchConfigSnapshot(cleanConfig.currentBatch, cleanConfig);
+  } catch (err) {
+    console.warn("Could not refresh batch config snapshot:", err);
+  }
+
+  await logAdminAction(
+    "config.save",
+    actorEmail,
+    "ตั้งค่าระบบ",
+    `บันทึกการตั้งค่าระบบ (รุ่นที่ ${cleanConfig.currentBatch})`,
+    cleanConfig.currentBatch
+  );
+}
+
+function batchConfigRef(batchId: number) {
+  return doc(db, "config", `batch_${batchId}`);
+}
+
+/** Freezes the current question/instructor/department lists for one batch. */
+export async function saveBatchConfigSnapshot(
+  batchId: number,
+  config: FormConfig
+): Promise<void> {
+  if (IS_MOCK) return mockSaveBatchConfigSnapshot(batchId, config);
+  await setDoc(batchConfigRef(batchId), toBatchConfigSnapshot(batchId, config));
+}
+
+/** Returns the frozen config for a batch, or `null` when none was taken. */
+export async function getBatchConfigSnapshot(
+  batchId: number
+): Promise<BatchConfigSnapshot | null> {
+  if (IS_MOCK) return mockGetBatchConfigSnapshot(batchId);
+  try {
+    const snap = await getDoc(batchConfigRef(batchId));
+    if (!snap.exists()) return null;
+    const data = snap.data() as Partial<BatchConfigSnapshot>;
+    return {
+      batchId,
+      form1Questions: data.form1Questions ?? [],
+      form2Instructors: data.form2Instructors ?? [],
+      form2Questions: data.form2Questions ?? [],
+      form3Departments: data.form3Departments ?? [],
+      snapshotAt: data.snapshotAt ?? "",
+    };
+  } catch (err) {
+    console.warn(`Could not read config snapshot for batch ${batchId}:`, err);
+    return null;
+  }
+}
+
+/**
+ * Creates snapshots from the current config for every batch that has none yet.
+ * Existing snapshots are never overwritten — they are the historical record.
+ */
+export async function backfillBatchConfigSnapshots(
+  config: FormConfig
+): Promise<{ created: number[]; skipped: number[] }> {
+  const created: number[] = [];
+  const skipped: number[] = [];
+
+  for (const batch of config.batches || []) {
+    const existing = await getBatchConfigSnapshot(batch.id);
+    if (existing) {
+      skipped.push(batch.id);
+      continue;
+    }
+    await saveBatchConfigSnapshot(batch.id, config);
+    created.push(batch.id);
+  }
+
+  return { created, skipped };
 }
 
 /**
@@ -419,9 +516,18 @@ export async function saveFormConfig(config: FormConfig): Promise<void> {
  */
 export async function createNewBatch(
   currentConfig: FormConfig,
-  newBatchNumber: number
+  newBatchNumber: number,
+  actorEmail: string = "admin@example.com"
 ): Promise<FormConfig> {
   if (IS_MOCK) return mockCreateNewBatch(currentConfig, newBatchNumber);
+
+  // Freeze the outgoing batch first — once the new batch starts, admins will
+  // edit the live config and the old batch's answers must stay interpretable.
+  try {
+    await saveBatchConfigSnapshot(currentConfig.currentBatch, currentConfig);
+  } catch (err) {
+    console.warn("Could not snapshot the outgoing batch config:", err);
+  }
 
   const newBatch: BatchMeta = {
     id: newBatchNumber,
@@ -453,5 +559,65 @@ export async function createNewBatch(
   // We don't need to actively write empty arrays — the getCompletedForms function
   // returns [] for missing batch keys.
 
+  // Log action
+  await logAdminAction(
+    "batch.create",
+    actorEmail,
+    newBatch.label,
+    `สร้างรุ่นใหม่ ${newBatch.label}`,
+    newBatchNumber
+  );
+
   return newConfig;
 }
+
+export async function logAdminAction(
+  action: AdminAuditLog["action"],
+  actorEmail: string,
+  targetLabel: string,
+  detail: string,
+  batchId?: number
+): Promise<void> {
+  if (IS_MOCK) return mockLogAdminAction(action, actorEmail, targetLabel, detail, batchId);
+  try {
+    const newDocRef = doc(collection(db, "admin_audit"));
+    await setDoc(newDocRef, {
+      action,
+      actorEmail,
+      targetLabel,
+      detail,
+      batchId: batchId ?? null,
+      at: serverTimestamp(),
+    });
+  } catch (err) {
+    console.warn("Failed to log admin action:", err);
+  }
+}
+
+export async function getAuditLogs(limitCount = 50): Promise<AdminAuditLog[]> {
+  if (IS_MOCK) return mockGetAuditLogs(limitCount);
+  try {
+    const q = query(
+      collection(db, "admin_audit"),
+      orderBy("at", "desc"),
+      limit(limitCount)
+    );
+    const snap = await getDocs(q);
+    return snap.docs.map((d) => {
+      const data = d.data();
+      return {
+        id: d.id,
+        action: data.action,
+        actorEmail: data.actorEmail,
+        targetLabel: data.targetLabel,
+        detail: data.detail,
+        batchId: data.batchId,
+        at: toIso(data.at),
+      } as AdminAuditLog;
+    });
+  } catch (err) {
+    console.warn("Failed to get audit logs:", err);
+    return [];
+  }
+}
+

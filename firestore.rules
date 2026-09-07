@@ -61,5 +61,10 @@ service cloud.firestore {
       allow read: if true;
       allow write: if isAdmin();
     }
+
+    // สำหรับ Collection: admin_audit (บันทึกการกระทำของ Admin)
+    match /admin_audit/{document=**} {
+      allow read, write: if isAdmin();
+    }
   }
 }
