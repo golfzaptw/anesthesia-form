@@ -441,6 +441,9 @@ export default function AdminPage() {
     form1Avg,
     onExport: handleExport,
     onExportSummary: handleExportSummary,
+    onDownloadAll: handleDownloadAll,
+    onGeneratePDF: handleGeneratePDF,
+    isGeneratingPDF,
     onSetUserToDelete: setUserToDelete,
     onBackfillSnapshots: handleBackfillSnapshots,
     onMigrateSubmissions: handleMigrateSubmissions,
@@ -472,7 +475,7 @@ export default function AdminPage() {
         </div>
       </header>
 
-      <main id="admin-report-content" className="max-w-4xl mx-auto px-4 py-4 sm:py-6 bg-gray-50">
+      <main id="admin-report-content" className="max-w-4xl mx-auto px-4 py-4 sm:py-6 bg-gray-50 print:bg-transparent print:p-0">
         {/* Batch Selector */}
         {config && config.batches.length > 0 && (
           <div data-html2canvas-ignore="true" className="mb-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 print:hidden">
@@ -531,40 +534,7 @@ export default function AdminPage() {
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
-              <button
-                onClick={handleDownloadAll}
-                className="flex items-center justify-center gap-1.5 bg-white border border-gray-200 hover:border-blue-300 hover:bg-blue-50 text-gray-700 hover:text-blue-700 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all shadow-sm"
-                title="ดาวน์โหลดไฟล์ CSV ทั้งหมด"
-              >
-                <Download className="w-4 h-4" />
-                <span className="hidden sm:inline">ดาวน์โหลดทั้งหมด</span>
-                <span className="sm:hidden">ทั้งหมด</span>
-              </button>
-              
-              <button
-                onClick={() => window.print()}
-                className="flex items-center justify-center gap-1.5 bg-white border border-gray-200 hover:border-indigo-300 hover:bg-indigo-50 text-gray-700 hover:text-indigo-700 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all shadow-sm"
-                title="พิมพ์รายงานหน้านี้"
-              >
-                <Printer className="w-4 h-4" />
-                <span className="hidden sm:inline">พิมพ์รายงาน</span>
-                <span className="sm:hidden">พิมพ์</span>
-              </button>
 
-              <button
-                onClick={handleGeneratePDF}
-                disabled={isGeneratingPDF}
-                className="flex items-center justify-center gap-1.5 bg-white border border-gray-200 hover:border-red-300 hover:bg-red-50 text-gray-700 hover:text-red-700 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all shadow-sm disabled:opacity-50"
-                title="ดาวน์โหลดรายงานเป็น PDF"
-              >
-                {isGeneratingPDF ? (
-                   <div className="w-4 h-4 border-2 border-red-500 border-t-transparent rounded-full animate-spin" />
-                ) : (
-                   <FileSpreadsheet className="w-4 h-4" />
-                )}
-                <span className="hidden sm:inline">Export PDF</span>
-                <span className="sm:hidden">PDF</span>
-              </button>
 
               <button
                 onClick={() => setShowNewBatchModal(true)}
@@ -721,7 +691,7 @@ export default function AdminPage() {
         )}
 
         {/* Summary stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6 print:hidden">
           <StatCard icon={Users} label="ผู้ลงทะเบียน" value={batchUsers.length} tone="blue" />
           <StatCard
             icon={FileCheck2}

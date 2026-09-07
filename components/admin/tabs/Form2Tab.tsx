@@ -1,11 +1,20 @@
 import { ScoreBar } from "@/components/admin/ScoreBar";
 import { Collapsible } from "@/components/admin/Collapsible";
 import { CommentList } from "@/components/admin/CommentList";
+import { ExportActions } from "@/components/admin/ExportActions";
 import type { AdminTabProps } from "./types";
 
-export function Form2Tab({ byForm, form2 }: AdminTabProps) {
+export function Form2Tab({ byForm, form2, onDownloadAll, onGeneratePDF, isGeneratingPDF, activeBatch }: AdminTabProps) {
   return (
     <div className="space-y-3">
+      <ExportActions />
+
+      <div className="hidden print:block mb-8 text-center">
+        <h1 className="text-lg font-bold text-gray-900 leading-relaxed">
+          แบบประเมินความพึงพอใจของนักเรียนพยาบาลวิสัญญี {activeBatch ? `รุ่นที่ ${activeBatch}` : ""} <br/> 
+          ต่อหลักสูตรวิสัญญี ด้านอาจารย์แพทย์
+        </h1>
+      </div>
       <p className="text-xs text-gray-400">
         จาก {byForm.form_2.length} คำตอบ — เรียงตามคะแนนเฉลี่ย
       </p>

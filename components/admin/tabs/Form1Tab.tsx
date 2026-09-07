@@ -1,9 +1,18 @@
 import { ScoreBar } from "@/components/admin/ScoreBar";
+import { ExportActions } from "@/components/admin/ExportActions";
 import type { AdminTabProps } from "./types";
 
-export function Form1Tab({ byForm, form1 }: AdminTabProps) {
+export function Form1Tab({ byForm, form1, onDownloadAll, onGeneratePDF, isGeneratingPDF, activeBatch }: AdminTabProps) {
   return (
     <div className="space-y-4">
+      <ExportActions />
+
+      <div className="hidden print:block mb-8 text-center">
+        <h1 className="text-lg font-bold text-gray-900 leading-relaxed">
+          แบบประเมินความพึงพอใจของนักเรียนพยาบาลวิสัญญี {activeBatch ? `รุ่นที่ ${activeBatch}` : ""} <br/> 
+          ต่อหลักสูตรวิสัญญี ด้านการจัดการเรียนการสอน
+        </h1>
+      </div>
       <div className="bg-white rounded-xl border border-gray-200 p-4">
         <h2 className="font-semibold text-sm text-gray-800 mb-1">
           คะแนนเฉลี่ยรายข้อ
