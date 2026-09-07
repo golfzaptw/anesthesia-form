@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { getCompletedForms, getFormConfig, getEditCount, getExistingSubmission } from "@/lib/firestore";
-import type { FormConfig } from "@/lib/formData";
+import { type FormConfig, checkFormAccess } from "@/lib/formData";
 import { Form2 } from "@/components/forms/Form2";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import Link from "next/link";
@@ -22,15 +22,7 @@ export default function Form2Page() {
 
     (async () => {
       const conf = await getFormConfig();
-      const now = Date.now();
-      const startMs = conf.startDate ? new Date(conf.startDate).getTime() : 0;
-      const endMs = conf.endDate ? new Date(conf.endDate).getTime() : 0;
-
-      if (
-        conf.isForceClosed ||
-        (startMs > 0 && now < startMs) ||
-        (endMs > 0 && now > endMs)
-      ) {
+      if (!checkFormAccess(conf, "form_2")) {
         router.replace("/hub");
         return;
       }

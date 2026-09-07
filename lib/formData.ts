@@ -1,4 +1,34 @@
-import type { BatchMeta, FormCardMeta } from "@/types";
+import type { BatchConfigSnapshot, BatchMeta, FormCardMeta, FormId } from "@/types";
+
+export function checkFormAccess(config: FormConfig, formId: FormId): boolean {
+  const state = config.formStates?.[formId];
+  if (state?.closed) return false;
+  if (state?.closed) return false;
+  const now = Date.now();
+  
+  if (config.isForceClosed && !state?.closed && (!state || (state.closed === undefined && !state.startDate && !state.endDate))) {
+    return false; // global force close applies if no override
+  }
+  if (state?.closed) return false;
+
+  // Let's simplify: 
+  // If state explicitly opens/closes, use that.
+  let isClosed = config.isForceClosed;
+  let startMs = config.startDate ? new Date(config.startDate).getTime() : 0;
+  let endMs = config.endDate ? new Date(config.endDate).getTime() : 0;
+  
+  if (state) {
+    if (state.closed !== undefined) isClosed = state.closed;
+    if (state.startDate) startMs = new Date(state.startDate).getTime();
+    if (state.endDate) endMs = new Date(state.endDate).getTime();
+  }
+
+  if (isClosed) return false;
+  if (startMs > 0 && now < startMs) return false;
+  if (endMs > 0 && now > endMs) return false;
+
+  return true;
+}
 
 export function getFormsMeta(batch: number): FormCardMeta[] {
   return [
@@ -93,8 +123,45 @@ export interface FormConfig {
   isForceClosed?: boolean;
   startDate?: string;
   endDate?: string;
+  formStates?: Record<FormId, { closed?: boolean; startDate?: string; endDate?: string }>;
   currentBatch: number;
   batches: BatchMeta[];
+}
+
+/** Deep-copies the list parts of a config into a snapshot for one batch. */
+export function toBatchConfigSnapshot(
+  batchId: number,
+  config: FormConfig
+): BatchConfigSnapshot {
+  return {
+    batchId,
+    form1Questions: [...(config.form1Questions || [])],
+    form2Instructors: [...(config.form2Instructors || [])],
+    form2Questions: [...(config.form2Questions || [])],
+    form3Departments: (config.form3Departments || []).map((d) => ({
+      dept: d.dept || "",
+      staff: [...(d.staff || [])],
+      allowSkip: isDeptAllowSkip(d),
+    })),
+    snapshotAt: new Date().toISOString(),
+  };
+}
+
+/**
+ * Returns a config whose lists come from `snapshot` — used so analytics can run
+ * against the wording a batch actually saw while keeping batch metadata intact.
+ */
+export function configFromSnapshot(
+  base: FormConfig,
+  snapshot: BatchConfigSnapshot
+): FormConfig {
+  return {
+    ...base,
+    form1Questions: snapshot.form1Questions,
+    form2Instructors: snapshot.form2Instructors,
+    form2Questions: snapshot.form2Questions,
+    form3Departments: snapshot.form3Departments,
+  };
 }
 
 export const FORM3_DEPARTMENTS: DepartmentData[] = [
@@ -252,6 +319,11 @@ export const DEFAULT_FORM_CONFIG: FormConfig = {
   isForceClosed: false,
   startDate: "",
   endDate: "",
+  formStates: {
+    form_1: { closed: false, startDate: "", endDate: "" },
+    form_2: { closed: false, startDate: "", endDate: "" },
+    form_3: { closed: false, startDate: "", endDate: "" },
+  },
   currentBatch: 42,
   batches: [
     {

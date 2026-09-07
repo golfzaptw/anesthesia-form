@@ -643,7 +643,7 @@ export function Form2({
         ) : (
           filteredInstructors.map(({ name, index }) => (
             <InstructorSection
-              key={name}
+              key={`form2-ins-${index}`}
               index={index}
               name={name}
               questions={questions}
