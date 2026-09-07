@@ -39,7 +39,9 @@ export function Collapsible({
           )}
         </span>
       </button>
-      {open && <div className="px-4 pb-4 border-t border-gray-100">{children}</div>}
+      <div className={`${open ? "block" : "hidden print:block"} px-4 pb-4 border-t border-gray-100`}>
+        {children}
+      </div>
     </div>
   );
 }

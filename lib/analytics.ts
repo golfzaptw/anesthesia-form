@@ -6,12 +6,17 @@ export interface ScoreStat {
   average: number;
   count: number;
   distribution: number[]; // index 0 => score 1
+  median: number;
+  stdDev: number;
+  topBoxRate: number; // % of 4-5
+  lowBoxRate: number; // % of 1-2
 }
 
 export interface CommentEntry {
   label: string;
   evaluatorName: string;
   text: string;
+  givenScore?: number;
 }
 
 function toScore(value: unknown): number | null {
@@ -23,6 +28,7 @@ function summarise(label: string, values: unknown[]): ScoreStat {
   const distribution = [0, 0, 0, 0, 0];
   let sum = 0;
   let count = 0;
+  const validScores: number[] = [];
 
   for (const v of values) {
     const score = toScore(v);
@@ -30,26 +36,57 @@ function summarise(label: string, values: unknown[]): ScoreStat {
     distribution[score - 1] += 1;
     sum += score;
     count += 1;
+    validScores.push(score);
+  }
+
+  const average = count ? sum / count : 0;
+  
+  let median = 0;
+  let stdDev = 0;
+  let topBoxRate = 0;
+  let lowBoxRate = 0;
+
+  if (count > 0) {
+    // Median
+    validScores.sort((a, b) => a - b);
+    const mid = Math.floor(count / 2);
+    median = count % 2 !== 0 ? validScores[mid] : (validScores[mid - 1] + validScores[mid]) / 2;
+
+    // Standard Deviation (Population)
+    const variance = validScores.reduce((acc, val) => acc + Math.pow(val - average, 2), 0) / count;
+    stdDev = Math.sqrt(variance);
+
+    // Box rates
+    const topBoxCount = distribution[3] + distribution[4]; // Scores 4 and 5
+    const lowBoxCount = distribution[0] + distribution[1]; // Scores 1 and 2
+    topBoxRate = (topBoxCount / count) * 100;
+    lowBoxRate = (lowBoxCount / count) * 100;
   }
 
   return {
     label,
-    average: count ? sum / count : 0,
+    average,
     count,
     distribution,
+    median,
+    stdDev,
+    topBoxRate,
+    lowBoxRate,
   };
 }
 
 function collectComments(
   subs: StoredSubmission[],
   key: string,
-  label: string
+  label: string,
+  scoreExtractor?: (s: StoredSubmission) => number | undefined
 ): CommentEntry[] {
   return subs
     .map((s) => ({
       label,
       evaluatorName: s.evaluatorName,
       text: String(s.answers[key] ?? "").trim(),
+      givenScore: scoreExtractor ? scoreExtractor(s) : undefined,
     }))
     .filter((c) => c.text.length > 0);
 }
@@ -59,7 +96,7 @@ export function analyseForm1(subs: StoredSubmission[], config: FormConfig) {
     summarise(`${i + 1}. ${q}`, subs.map((s) => s.answers[`q${i + 1}_score`]))
   );
   const comments = config.form1Questions.flatMap((q, i) =>
-    collectComments(subs, `q${i + 1}_suggestion`, `${i + 1}. ${q}`)
+    collectComments(subs, `q${i + 1}_suggestion`, `${i + 1}. ${q}`, (s) => toScore(s.answers[`q${i + 1}_score`]) ?? undefined)
   );
   return { scores, comments };
 }
@@ -94,7 +131,18 @@ export function analyseForm2(subs: StoredSubmission[], config: FormConfig): Inst
       notMetCount,
       overallAverage,
       scores,
-      comments: collectComments(subs, `i${i}_suggestion`, name),
+      comments: collectComments(subs, `i${i}_suggestion`, name, (s) => {
+        let sum = 0;
+        let count = 0;
+        config.form2Questions.forEach((_, qi) => {
+          const sc = toScore(s.answers[`i${i}_q${qi + 1}`]);
+          if (sc !== null) {
+            sum += sc;
+            count++;
+          }
+        });
+        return count > 0 ? sum / count : undefined;
+      }),
     };
   });
 }

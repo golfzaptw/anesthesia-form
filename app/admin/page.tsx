@@ -4,28 +4,32 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
-import { getAllSubmissions, getAllUsers, getFormConfig, deleteUser, saveFormConfig, createNewBatch, migrateSubmissionIds } from "@/lib/firestore";
+import { getAllSubmissions, getAllUsers, getFormConfig, deleteUser, saveFormConfig, createNewBatch, migrateSubmissionIds, getBatchConfigSnapshot, backfillBatchConfigSnapshots } from "@/lib/firestore";
 import { isAdmin, HAS_ADMINS } from "@/lib/admin";
-import { getFormsMeta, type FormConfig } from "@/lib/formData";
+import { getFormsMeta, configFromSnapshot, type FormConfig } from "@/lib/formData";
 import {
   analyseForm1,
   analyseForm2,
   analyseForm3,
   overallAverage,
 } from "@/lib/analytics";
-import { submissionsToCsv, downloadCsv } from "@/lib/csv";
+import { submissionsToCsv, downloadCsv, summaryToCsv } from "@/lib/csv";
+import { generatePDF } from "@/lib/pdfExport";
 import { StatCard } from "@/components/admin/StatCard";
-import { ScoreBar } from "@/components/admin/ScoreBar";
-import { Collapsible } from "@/components/admin/Collapsible";
 import { FormEditor } from "@/components/admin/FormEditor";
+import { TimeSettings } from "@/components/admin/TimeSettings";
+import { OverviewTab } from "@/components/admin/tabs/OverviewTab";
+import { Form1Tab } from "@/components/admin/tabs/Form1Tab";
+import { Form2Tab } from "@/components/admin/tabs/Form2Tab";
+import { Form3Tab } from "@/components/admin/tabs/Form3Tab";
+import { CompareTab } from "@/components/admin/tabs/CompareTab";
+import type { AdminTabProps } from "@/components/admin/tabs/types";
 import { Footer } from "@/components/ui/Footer";
 import {
   LogOut,
   Users,
   FileCheck2,
   Star,
-  Download,
-  MessageSquare,
   ShieldAlert,
   BarChart3,
   Trash2,
@@ -37,13 +41,15 @@ import {
   ChevronDown,
   Plus,
   Layers,
-  Pencil,
   DatabaseZap,
+  Printer,
+  Download,
+  FileSpreadsheet,
 } from "lucide-react";
-import type { FormId, StoredSubmission, UserSummary } from "@/types";
+import type { BatchConfigSnapshot, FormId, StoredSubmission, UserSummary } from "@/types";
 import toast from "react-hot-toast";
 
-type Tab = FormId | "overview" | "editor";
+type Tab = FormId | "overview" | "editor" | "compare";
 
 export default function AdminPage() {
   const { user, loading, signOut } = useAuth();
@@ -64,6 +70,15 @@ export default function AdminPage() {
   const [showNewBatchModal, setShowNewBatchModal] = useState(false);
   const [isCreatingBatch, setIsCreatingBatch] = useState(false);
   const [isMigrating, setIsMigrating] = useState(false);
+  const [isBackfilling, setIsBackfilling] = useState(false);
+  const [showTimeSettings, setShowTimeSettings] = useState(false);
+  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+
+  // Frozen config of the batch being viewed — analytics must not use the live
+  // config, or renaming/reordering entries would re-label historical answers.
+  const [batchSnapshot, setBatchSnapshot] = useState<BatchConfigSnapshot | null>(null);
+  const [snapshotLoading, setSnapshotLoading] = useState(false);
+  const [snapshotVersion, setSnapshotVersion] = useState(0);
 
   const allowed = !HAS_ADMINS || isAdmin(user?.email);
 
@@ -105,6 +120,31 @@ export default function AdminPage() {
     getAllSubmissions(selectedBatch).then(setSubmissions);
   }, [selectedBatch, user, allowed, fetching]);
 
+  // Load the frozen config of the batch being viewed
+  useEffect(() => {
+    if (!user || !allowed || !config) return;
+    let cancelled = false;
+    setSnapshotLoading(true);
+    getBatchConfigSnapshot(activeBatch)
+      .then((snap) => {
+        if (!cancelled) setBatchSnapshot(snap);
+      })
+      .finally(() => {
+        if (!cancelled) setSnapshotLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeBatch, user, allowed, config, snapshotVersion]);
+
+  /** Config to analyse/export with: the batch snapshot, falling back to live config. */
+  const analysisConfig = useMemo(() => {
+    if (!config) return null;
+    return batchSnapshot ? configFromSnapshot(config, batchSnapshot) : config;
+  }, [config, batchSnapshot]);
+
+  const usingLiveConfigFallback = Boolean(config) && !batchSnapshot && !snapshotLoading;
+
   const byForm = useMemo(
     () => ({
       form_1: submissions.filter((s) => s.formId === "form_1"),
@@ -114,9 +154,9 @@ export default function AdminPage() {
     [submissions]
   );
 
-  const form1 = useMemo(() => config ? analyseForm1(byForm.form_1, config) : { scores: [], comments: [] }, [byForm.form_1, config]);
-  const form2 = useMemo(() => config ? analyseForm2(byForm.form_2, config) : [], [byForm.form_2, config]);
-  const form3 = useMemo(() => config ? analyseForm3(byForm.form_3, config) : [], [byForm.form_3, config]);
+  const form1 = useMemo(() => analysisConfig ? analyseForm1(byForm.form_1, analysisConfig) : { scores: [], comments: [] }, [byForm.form_1, analysisConfig]);
+  const form2 = useMemo(() => analysisConfig ? analyseForm2(byForm.form_2, analysisConfig) : [], [byForm.form_2, analysisConfig]);
+  const form3 = useMemo(() => analysisConfig ? analyseForm3(byForm.form_3, analysisConfig) : [], [byForm.form_3, analysisConfig]);
 
   const formLockStatus = useMemo(() => {
     if (!config) return { state: "loading", label: "กำลังโหลดสถานะ...", desc: "", tone: "gray" };
@@ -188,7 +228,7 @@ export default function AdminPage() {
 
   // Auto-switch to overview if switching to a past batch while in editor tab
   useEffect(() => {
-    if (!isViewingCurrentBatch && tab === "editor") {
+    if (!isViewingCurrentBatch && (tab === "editor")) {
       setTab("overview");
     }
   }, [isViewingCurrentBatch, tab]);
@@ -199,6 +239,7 @@ export default function AdminPage() {
       { id: "form_1", label: "การเรียนการสอน" },
       { id: "form_2", label: "อาจารย์แพทย์" },
       { id: "form_3", label: "พยาบาลวิสัญญี" },
+      { id: "compare", label: "เทียบรุ่น" },
     ];
     if (isViewingCurrentBatch) {
       base.push({ id: "editor", label: "ตั้งค่าแบบประเมิน" });
@@ -274,8 +315,72 @@ export default function AdminPage() {
 
   const handleExport = (formId: FormId) => {
     const subs = byForm[formId];
-    if (!subs.length || !config) return;
-    downloadCsv(`${formId}_batch${activeBatch}_submissions.csv`, submissionsToCsv(subs, formId, config));
+    if (!subs.length || !analysisConfig) return;
+    downloadCsv(`${formId}_batch${activeBatch}_submissions.csv`, submissionsToCsv(subs, formId, analysisConfig));
+  };
+
+  const handleExportSummary = () => {
+    if (!analysisConfig) return;
+    const csv = summaryToCsv(form1, form2, form3);
+    downloadCsv(`summary_batch${activeBatch}.csv`, csv);
+  };
+
+  const handleDownloadAll = () => {
+    if (!analysisConfig) return;
+    
+    const delays = [0, 200, 400, 600];
+    let step = 0;
+
+    if (byForm.form_1 && byForm.form_1.length > 0) {
+      setTimeout(() => {
+        downloadCsv(`form_1_batch${activeBatch}_submissions.csv`, submissionsToCsv(byForm.form_1, "form_1", analysisConfig));
+      }, delays[step++]);
+    }
+    if (byForm.form_2 && byForm.form_2.length > 0) {
+      setTimeout(() => {
+        downloadCsv(`form_2_batch${activeBatch}_submissions.csv`, submissionsToCsv(byForm.form_2, "form_2", analysisConfig));
+      }, delays[step++]);
+    }
+    if (byForm.form_3 && byForm.form_3.length > 0) {
+      setTimeout(() => {
+        downloadCsv(`form_3_batch${activeBatch}_submissions.csv`, submissionsToCsv(byForm.form_3, "form_3", analysisConfig));
+      }, delays[step++]);
+    }
+    
+    setTimeout(() => {
+      handleExportSummary();
+    }, delays[step]);
+  };
+
+  const handleGeneratePDF = async () => {
+    setIsGeneratingPDF(true);
+    const toastId = toast.loading("กำลังสร้าง PDF...");
+    try {
+      await generatePDF("admin-report-content", `admin_report_batch_${activeBatch}.pdf`);
+      toast.success("สร้าง PDF สำเร็จ!", { id: toastId });
+    } catch {
+      toast.error("เกิดข้อผิดพลาดในการสร้าง PDF", { id: toastId });
+    } finally {
+      setIsGeneratingPDF(false);
+    }
+  };
+
+  const handleBackfillSnapshots = async () => {
+    if (!config) return;
+    setIsBackfilling(true);
+    try {
+      const { created, skipped } = await backfillBatchConfigSnapshots(config);
+      setSnapshotVersion((v) => v + 1);
+      toast.success(
+        created.length
+          ? `บันทึกชุดคำถามย้อนหลังสำเร็จ — สร้างใหม่ ${created.length} รุ่น (${created.join(", ")}), มีอยู่แล้ว ${skipped.length} รุ่น`
+          : `ทุกรุ่นมีชุดคำถามบันทึกไว้แล้ว (${skipped.length} รุ่น)`
+      );
+    } catch {
+      toast.error("บันทึกชุดคำถามย้อนหลังไม่สำเร็จ — กรุณาตรวจสอบ Firestore Rules");
+    } finally {
+      setIsBackfilling(false);
+    }
   };
 
   const handleMigrateSubmissions = async () => {
@@ -321,9 +426,31 @@ export default function AdminPage() {
     }
   };
 
+  const tabProps: AdminTabProps = {
+    config,
+    analysisConfig,
+    submissions,
+    users,
+    batchUsers,
+    activeBatch,
+    isViewingCurrentBatch,
+    byForm,
+    form1,
+    form2,
+    form3,
+    form1Avg,
+    onExport: handleExport,
+    onExportSummary: handleExportSummary,
+    onSetUserToDelete: setUserToDelete,
+    onBackfillSnapshots: handleBackfillSnapshots,
+    onMigrateSubmissions: handleMigrateSubmissions,
+    isBackfilling,
+    isMigrating,
+  };
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
+    <div className="min-h-screen bg-gray-50 print:bg-white">
+      <header className="bg-white border-b border-gray-200 sticky top-0 z-10 print:hidden">
         <div className="max-w-4xl mx-auto px-4 py-3 flex flex-wrap sm:flex-nowrap items-center justify-between gap-2">
           <span className="text-sm font-bold text-gray-800 flex items-center gap-2">
             <BarChart3 className="w-5 h-5 text-blue-600" />
@@ -345,10 +472,10 @@ export default function AdminPage() {
         </div>
       </header>
 
-      <main className="max-w-4xl mx-auto px-4 py-4 sm:py-6">
+      <main id="admin-report-content" className="max-w-4xl mx-auto px-4 py-4 sm:py-6 bg-gray-50">
         {/* Batch Selector */}
         {config && config.batches.length > 0 && (
-          <div className="mb-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
+          <div data-html2canvas-ignore="true" className="mb-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 print:hidden">
             <div className="relative">
               <button
                 onClick={() => setShowBatchDropdown(!showBatchDropdown)}
@@ -403,13 +530,51 @@ export default function AdminPage() {
               )}
             </div>
 
-            <button
-              onClick={() => setShowNewBatchModal(true)}
-              className="flex items-center justify-center gap-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-4 py-2.5 rounded-xl text-sm font-semibold shadow-sm shadow-blue-500/20 transition-all"
-            >
-              <Plus className="w-4 h-4" />
-              สร้างรุ่นใหม่
-            </button>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                onClick={handleDownloadAll}
+                className="flex items-center justify-center gap-1.5 bg-white border border-gray-200 hover:border-blue-300 hover:bg-blue-50 text-gray-700 hover:text-blue-700 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all shadow-sm"
+                title="ดาวน์โหลดไฟล์ CSV ทั้งหมด"
+              >
+                <Download className="w-4 h-4" />
+                <span className="hidden sm:inline">ดาวน์โหลดทั้งหมด</span>
+                <span className="sm:hidden">ทั้งหมด</span>
+              </button>
+              
+              <button
+                onClick={() => window.print()}
+                className="flex items-center justify-center gap-1.5 bg-white border border-gray-200 hover:border-indigo-300 hover:bg-indigo-50 text-gray-700 hover:text-indigo-700 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all shadow-sm"
+                title="พิมพ์รายงานหน้านี้"
+              >
+                <Printer className="w-4 h-4" />
+                <span className="hidden sm:inline">พิมพ์รายงาน</span>
+                <span className="sm:hidden">พิมพ์</span>
+              </button>
+
+              <button
+                onClick={handleGeneratePDF}
+                disabled={isGeneratingPDF}
+                className="flex items-center justify-center gap-1.5 bg-white border border-gray-200 hover:border-red-300 hover:bg-red-50 text-gray-700 hover:text-red-700 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all shadow-sm disabled:opacity-50"
+                title="ดาวน์โหลดรายงานเป็น PDF"
+              >
+                {isGeneratingPDF ? (
+                   <div className="w-4 h-4 border-2 border-red-500 border-t-transparent rounded-full animate-spin" />
+                ) : (
+                   <FileSpreadsheet className="w-4 h-4" />
+                )}
+                <span className="hidden sm:inline">Export PDF</span>
+                <span className="sm:hidden">PDF</span>
+              </button>
+
+              <button
+                onClick={() => setShowNewBatchModal(true)}
+                className="flex items-center justify-center gap-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-semibold shadow-sm shadow-blue-500/20 transition-all"
+              >
+                <Plus className="w-4 h-4" />
+                <span className="hidden sm:inline">สร้างรุ่นใหม่</span>
+                <span className="sm:hidden">รุ่นใหม่</span>
+              </button>
+            </div>
           </div>
         )}
 
@@ -433,6 +598,12 @@ export default function AdminPage() {
                   <p className="text-xs text-amber-800 mt-1 leading-relaxed">
                     รุ่นนี้ปิดรับคำตอบแล้ว สามารถดูผลคะแนน สถิติ ข้อเสนอแนะ และดาวน์โหลดรายงาน CSV ได้อย่างเดียว (ไม่สามารถแก้ไขข้อมูลได้)
                   </p>
+                  {usingLiveConfigFallback && (
+                    <div className="mt-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-red-100 text-red-700 border border-red-200 text-xs font-semibold">
+                      <DatabaseZap className="w-3.5 h-3.5" />
+                      คำเตือน: กำลังใช้ Config ปัจจุบัน — ชื่อคำถามหรืออาจารย์อาจไม่ตรงกับตอนที่ประเมิน
+                    </div>
+                  )}
                 </div>
               </div>
               <button
@@ -447,7 +618,7 @@ export default function AdminPage() {
 
         {/* Assessment Status & Quick Lock Control Card */}
         {config && isViewingCurrentBatch && (
-          <div className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-5 mb-6 shadow-sm">
+          <div className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-5 mb-6 shadow-sm print:hidden">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div className="flex items-start gap-3.5">
                 <div className={`p-2.5 sm:p-3 rounded-2xl shrink-0 ${
@@ -519,7 +690,7 @@ export default function AdminPage() {
                 </button>
 
                 <button
-                  onClick={() => setTab("editor")}
+                  onClick={() => setShowTimeSettings(!showTimeSettings)}
                   className="px-3 py-2 rounded-xl text-xs font-semibold text-gray-600 hover:text-blue-600 bg-gray-100 hover:bg-blue-50 border border-gray-200 hover:border-blue-200 transition-colors flex items-center gap-1"
                 >
                   <Sliders className="w-3.5 h-3.5" />
@@ -528,6 +699,25 @@ export default function AdminPage() {
               </div>
             </div>
           </div>
+        )}
+
+        {/* Time Settings Panel */}
+        {showTimeSettings && config && (
+          <TimeSettings
+            initialConfig={config}
+            onSave={async (newConfig) => {
+              try {
+                await saveFormConfig(newConfig);
+                setConfig(newConfig);
+                setShowTimeSettings(false);
+                toast.success("บันทึกการตั้งค่าเวลาเรียบร้อยแล้ว");
+              } catch (error) {
+                console.error(error);
+                toast.error("เกิดข้อผิดพลาดในการบันทึก");
+              }
+            }}
+            onCancel={() => setShowTimeSettings(false)}
+          />
         )}
 
         {/* Summary stats */}
@@ -556,7 +746,7 @@ export default function AdminPage() {
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-1.5 mb-5 overflow-x-auto pb-2 -mx-4 px-4 sm:mx-0 sm:px-0">
+        <div data-html2canvas-ignore="true" className="flex gap-1.5 mb-5 overflow-x-auto pb-2 -mx-4 px-4 sm:mx-0 sm:px-0 print:hidden">
           {TABS.map((t) => (
             <button
               key={t.id}
@@ -574,274 +764,39 @@ export default function AdminPage() {
 
         {/* Overview: per-user completion */}
         {tab === "overview" && (
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              {formsMeta.map((f) => (
-                <div key={f.id} className="bg-white rounded-xl border border-gray-200 p-4">
-                  <p className="text-xs text-gray-500 leading-snug">{f.title}</p>
-                  <p className="text-2xl font-bold text-gray-800 mt-2">
-                    {byForm[f.id].length}
-                  </p>
-                  <button
-                    onClick={() => handleExport(f.id)}
-                    disabled={!byForm[f.id].length}
-                    className="mt-2 inline-flex items-center gap-1 text-xs text-blue-600 hover:underline disabled:text-gray-300 disabled:no-underline"
-                  >
-                    <Download className="w-3 h-3" />
-                    ดาวน์โหลด CSV
-                  </button>
-                </div>
-              ))}
-            </div>
-
-            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-              <div className="px-4 py-3 border-b border-gray-100 flex flex-wrap items-center justify-between gap-2">
-                <h2 className="font-semibold text-sm text-gray-800">
-                  สถานะรายบุคคล ({batchUsers.length})
-                </h2>
-                {isViewingCurrentBatch && (
-                  <button
-                    onClick={handleMigrateSubmissions}
-                    disabled={isMigrating}
-                    title="ย้ายคำตอบเก่ามาใช้รหัสอ้างอิงแบบใหม่ เพื่อให้ผู้ประเมินแก้ไขได้ 1 ครั้ง"
-                    className="inline-flex items-center gap-1.5 text-xs font-semibold text-gray-600 hover:text-blue-600 bg-gray-100 hover:bg-blue-50 border border-gray-200 hover:border-blue-200 px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <DatabaseZap className="w-3.5 h-3.5" />
-                    {isMigrating ? "กำลังย้ายข้อมูล..." : "ย้ายข้อมูลเก่าให้แก้ไขได้"}
-                  </button>
-                )}
-              </div>
-              {batchUsers.length === 0 ? (
-                <p className="text-sm text-gray-400 px-4 py-6 text-center">
-                  ยังไม่มีผู้ลงทะเบียนในรุ่นนี้
-                </p>
-              ) : (
-                <div className="overflow-x-auto w-full">
-                  <table className="w-full text-xs sm:text-sm min-w-[480px]">
-                    <thead className="bg-gray-50 text-gray-500">
-                      <tr>
-                        <th className="text-left font-medium px-4 py-2 w-12">ลำดับ</th>
-                        <th className="text-left font-medium px-4 py-2">ชื่อผู้ประเมิน</th>
-                        <th className="text-left font-medium px-4 py-2">วันที่ลงทะเบียน</th>
-                        <th className="text-center font-medium px-2 py-2">ชุด 1</th>
-                        <th className="text-center font-medium px-2 py-2">ชุด 2</th>
-                        <th className="text-center font-medium px-2 py-2">ชุด 3</th>
-                        {isViewingCurrentBatch && (
-                          <th className="text-center font-medium px-2 py-2 w-20">จัดการ</th>
-                        )}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {batchUsers.map((u, index) => (
-                        <tr key={u.uid} className="border-t border-gray-100">
-                          <td className="px-4 py-2 text-gray-500 text-sm">
-                            {index + 1}
-                          </td>
-                          <td className="px-4 py-2">
-                            <p className="font-medium text-gray-800">{u.displayName || "—"}</p>
-                            <p className="text-[11px] text-gray-400">{u.email}</p>
-                          </td>
-                          <td className="px-4 py-2 text-gray-500 text-xs">
-                            {u.createdAt ? new Date(u.createdAt).toLocaleString("th-TH", {
-                              year: "2-digit",
-                              month: "short",
-                              day: "numeric",
-                              hour: "2-digit",
-                              minute: "2-digit"
-                            }) : "—"}
-                          </td>
-                          {formsMeta.map((f) => {
-                            const submission = byForm[f.id].find(
-                              (s) => s.userId === u.uid || (u.email && s.userEmail === u.email)
-                            );
-                            return (
-                              <td key={f.id} className="text-center px-2 py-2">
-                                {submission ? (
-                                  <span className="inline-flex items-center gap-1 justify-center">
-                                    <span className="text-green-600 font-bold">✓</span>
-                                    {(submission.editCount ?? 0) >= 1 && (
-                                      <span
-                                        title="ผู้ประเมินได้แก้ไขคำตอบชุดนี้แล้ว"
-                                        className="inline-flex items-center gap-0.5 text-[10px] font-bold text-amber-700 bg-amber-100 border border-amber-200 rounded px-1 py-0.5"
-                                      >
-                                        <Pencil className="w-2.5 h-2.5" />
-                                        แก้ไขแล้ว
-                                      </span>
-                                    )}
-                                  </span>
-                                ) : (
-                                  <span className="text-gray-300">—</span>
-                                )}
-                              </td>
-                            );
-                          })}
-                          {isViewingCurrentBatch && (
-                            <td className="text-center px-2 py-2">
-                              <button
-                                onClick={() => setUserToDelete(u)}
-                                title="ลบผู้เข้าร่วมประเมิน"
-                                className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors inline-flex items-center justify-center"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            </td>
-                          )}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          </div>
+          <OverviewTab {...tabProps} />
         )}
 
         {/* Form 1 */}
         {tab === "form_1" && (
-          <div className="space-y-4">
-            <div className="bg-white rounded-xl border border-gray-200 p-4">
-              <h2 className="font-semibold text-sm text-gray-800 mb-1">
-                คะแนนเฉลี่ยรายข้อ
-              </h2>
-              <p className="text-xs text-gray-400 mb-2">
-                จาก {byForm.form_1.length} คำตอบ
-              </p>
-              {form1.scores.map((s) => (
-                <ScoreBar key={s.label} {...s} />
-              ))}
-            </div>
-
-            <Collapsible
-              title="ข้อเสนอแนะทั้งหมด"
-              badge={`${form1.comments.length}`}
-            >
-              {form1.comments.length === 0 ? (
-                <p className="text-sm text-gray-400 py-4 text-center">ยังไม่มีข้อเสนอแนะ</p>
-              ) : (
-                <ul className="divide-y divide-gray-100">
-                  {form1.comments.map((c, i) => (
-                    <li key={i} className="py-3">
-                      <p className="text-xs text-gray-400">{c.label}</p>
-                      <p className="text-sm text-gray-700 mt-0.5">{c.text}</p>
-                      <p className="text-xs text-gray-400 mt-1">— {c.evaluatorName}</p>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </Collapsible>
-          </div>
+          <Form1Tab {...tabProps} />
         )}
 
         {/* Form 2 */}
         {tab === "form_2" && (
-          <div className="space-y-3">
-            <p className="text-xs text-gray-400">
-              จาก {byForm.form_2.length} คำตอบ — เรียงตามคะแนนเฉลี่ย
-            </p>
-            {[...form2]
-              .sort((a, b) => b.overallAverage - a.overallAverage)
-              .map((ins) => (
-                <Collapsible
-                  key={ins.name}
-                  title={ins.name}
-                  badge={
-                    ins.metCount
-                      ? `${ins.overallAverage.toFixed(2)} · เคยเจอ ${ins.metCount}`
-                      : "ยังไม่มีผู้ประเมิน"
-                  }
-                >
-                  <div className="pt-2">
-                    {ins.scores.map((s) => (
-                      <ScoreBar key={s.label} {...s} />
-                    ))}
-                    {ins.comments.length > 0 && (
-                      <div className="mt-3 pt-3 border-t border-gray-100">
-                        <p className="text-xs font-medium text-gray-500 flex items-center gap-1 mb-2">
-                          <MessageSquare className="w-3 h-3" />
-                          ข้อเสนอแนะ
-                        </p>
-                        <ul className="space-y-2">
-                          {ins.comments.map((c, i) => (
-                            <li key={i} className="text-sm text-gray-700">
-                              {c.text}
-                              <span className="text-xs text-gray-400 ml-2">
-                                — {c.evaluatorName}
-                              </span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                  </div>
-                </Collapsible>
-              ))}
-          </div>
+          <Form2Tab {...tabProps} />
         )}
 
         {/* Form 3 */}
         {tab === "form_3" && (
-          <div className="space-y-3">
-            <p className="text-xs text-gray-400">จาก {byForm.form_3.length} คำตอบ</p>
-            {form3.map((d) => {
-              const total = d.staff.reduce((acc, s) => acc + s.comments.length, 0);
-              const totalMet = d.staff.reduce((acc, s) => acc + s.metCount, 0);
-              return (
-                <Collapsible
-                  key={d.dept}
-                  title={d.dept}
-                  badge={d.allowSkip
-                    ? `${total} ความเห็น · เคยเจอรวม ${totalMet} ครั้ง`
-                    : `${total} ความเห็น`
-                  }
-                >
-                  <ul className="divide-y divide-gray-100 pt-1">
-                    {d.staff.map((s) => (
-                      <li key={s.name} className="py-3">
-                        <div className="flex items-center justify-between gap-2">
-                          <p className="text-sm font-medium text-gray-800">{s.name}</p>
-                          {d.allowSkip && (
-                            <div className="flex items-center gap-2 text-xs shrink-0">
-                              {s.metCount > 0 && (
-                                <span className="px-2 py-0.5 rounded-full bg-green-50 text-green-700 border border-green-200 font-medium">
-                                  เคยเจอ {s.metCount}
-                                </span>
-                              )}
-                              {s.notMetCount > 0 && (
-                                <span className="px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 border border-gray-200 font-medium">
-                                  ไม่เคยเจอ {s.notMetCount}
-                                </span>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                        {s.comments.length === 0 ? (
-                          <p className="text-xs text-gray-300 mt-0.5">ยังไม่มีความเห็น</p>
-                        ) : (
-                          <ul className="mt-1 space-y-1">
-                            {s.comments.map((c, i) => (
-                               <li key={i} className="text-sm text-gray-600">
-                                {c.text}
-                                <span className="text-xs text-gray-400 ml-2">
-                                  — {c.evaluatorName}
-                                </span>
-                              </li>
-                            ))}
-                          </ul>
-                        )}
-                      </li>
-                    ))}
-                  </ul>
-                </Collapsible>
-              );
-            })}
-          </div>
+          <Form3Tab {...tabProps} />
+        )}
+
+        {/* Compare */}
+        {tab === "compare" && (
+          <CompareTab {...tabProps} />
         )}
 
         {/* Editor */}
         {tab === "editor" && config && (
           <FormEditor
             initialConfig={config}
-            onSave={(newConfig) => setConfig(newConfig)}
+            submissionCount={submissions.length}
+            onSave={(newConfig) => {
+              setConfig(newConfig);
+              // saveFormConfig refreshes the current batch's snapshot
+              setSnapshotVersion((v) => v + 1);
+            }}
           />
         )}
 
