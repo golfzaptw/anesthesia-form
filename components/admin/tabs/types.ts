@@ -21,6 +21,9 @@ export interface AdminTabProps {
   // Actions
   onExport: (formId: FormId) => void;
   onExportSummary?: () => void;
+  onDownloadAll?: () => void;
+  onGeneratePDF?: () => void;
+  isGeneratingPDF?: boolean;
   onSetUserToDelete?: (user: UserSummary) => void;
   onBackfillSnapshots?: () => void;
   onMigrateSubmissions?: () => void;
