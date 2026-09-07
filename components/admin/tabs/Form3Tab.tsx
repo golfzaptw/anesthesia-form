@@ -7,7 +7,7 @@ import { CommentList } from "@/components/admin/CommentList";
 import { ExportActions } from "@/components/admin/ExportActions";
 import type { AdminTabProps } from "./types";
 
-export function Form3Tab({ byForm, form3, onDownloadAll, onGeneratePDF, isGeneratingPDF, activeBatch }: AdminTabProps) {
+export function Form3Tab({ byForm, form3, activeBatch }: AdminTabProps) {
   const [printDeptIdx, setPrintDeptIdx] = useState<number | null>(null);
 
   const handlePrintDept = (idx: number) => {

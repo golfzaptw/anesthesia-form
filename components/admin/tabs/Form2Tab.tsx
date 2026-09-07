@@ -4,7 +4,7 @@ import { CommentList } from "@/components/admin/CommentList";
 import { ExportActions } from "@/components/admin/ExportActions";
 import type { AdminTabProps } from "./types";
 
-export function Form2Tab({ byForm, form2, onDownloadAll, onGeneratePDF, isGeneratingPDF, activeBatch }: AdminTabProps) {
+export function Form2Tab({ byForm, form2, activeBatch }: AdminTabProps) {
   return (
     <div className="space-y-3">
       <ExportActions />

@@ -42,9 +42,6 @@ import {
   Plus,
   Layers,
   DatabaseZap,
-  Printer,
-  Download,
-  FileSpreadsheet,
 } from "lucide-react";
 import type { BatchConfigSnapshot, FormId, StoredSubmission, UserSummary } from "@/types";
 import toast from "react-hot-toast";

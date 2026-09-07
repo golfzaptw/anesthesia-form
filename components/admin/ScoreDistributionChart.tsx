@@ -39,6 +39,7 @@ export function ScoreDistributionChart({ distribution, totalCount }: ScoreDistri
         <Tooltip 
           cursor={{ fill: '#f3f4f6' }}
           contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)', fontSize: '12px' }}
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           formatter={(value: any) => [`${value ?? 0} คน`, 'จำนวน']}
           labelFormatter={(label) => `ให้ ${label} คะแนน`}
         />

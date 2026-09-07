@@ -2,7 +2,7 @@ import { ScoreBar } from "@/components/admin/ScoreBar";
 import { ExportActions } from "@/components/admin/ExportActions";
 import type { AdminTabProps } from "./types";
 
-export function Form1Tab({ byForm, form1, onDownloadAll, onGeneratePDF, isGeneratingPDF, activeBatch }: AdminTabProps) {
+export function Form1Tab({ byForm, form1, activeBatch }: AdminTabProps) {
   return (
     <div className="space-y-4">
       <ExportActions />
