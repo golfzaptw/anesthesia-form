@@ -7,3 +7,14 @@
     font-family: var(--font-sarabun), sans-serif;
   }
 }
+
+@media print {
+  html, body {
+    background-color: white !important;
+  }
+  
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}

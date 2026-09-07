@@ -149,7 +149,7 @@ export default function HubPage() {
           <div className="flex items-center gap-3">
             <Clock className="w-5 h-5 text-amber-600 shrink-0" />
             <div>
-              <p className="text-sm font-semibold text-amber-800">เวลาที่เหลือในการทำแบบประเมิน</p>
+              <p className="text-sm font-semibold text-amber-800">เวลาที่เหลือในการทำแบบประเมิน (โดยรวม)</p>
               <p className="text-xs text-amber-700 mt-0.5">จะปิดรับในวันที่ {new Date(endMs).toLocaleString("th-TH")}</p>
             </div>
           </div>
@@ -258,16 +258,40 @@ export default function HubPage() {
         {timerUI}
 
         <div className="space-y-4">
-          {formsMeta.map((form) => (
-            <FormCard
-              key={form.id}
-              {...form}
-              completed={completedForms.includes(form.id)}
-              editsRemaining={editCounts[form.id] === 0 ? 1 : 0}
-              disabled={isDisabled}
-              disabledMessage={disabledMessage}
-            />
-          ))}
+          {formsMeta.map((form) => {
+            let formDisabled = isDisabled;
+            let formDisabledMessage = disabledMessage;
+
+            if (config && config.formStates && config.formStates[form.id]) {
+              const state = config.formStates[form.id]!;
+              if (state.closed) {
+                formDisabled = true;
+                formDisabledMessage = "แบบประเมินถูกปิดชั่วคราวโดยผู้ดูแลระบบ";
+              } else {
+                const fStart = state.startDate ? new Date(state.startDate).getTime() : 0;
+                const fEnd = state.endDate ? new Date(state.endDate).getTime() : 0;
+                
+                if (fStart > 0 && now < fStart) {
+                  formDisabled = true;
+                  formDisabledMessage = `ยังไม่เปิด (เปิด ${new Date(fStart).toLocaleString("th-TH")})`;
+                } else if (fEnd > 0 && now > fEnd) {
+                  formDisabled = true;
+                  formDisabledMessage = "หมดเวลาการประเมินแล้ว";
+                }
+              }
+            }
+
+            return (
+              <FormCard
+                key={form.id}
+                {...form}
+                completed={completedForms.includes(form.id)}
+                editsRemaining={editCounts[form.id] === 0 ? 1 : 0}
+                disabled={formDisabled}
+                disabledMessage={formDisabledMessage}
+              />
+            );
+          })}
         </div>
 
         <Footer className="mt-8 pb-8" />
