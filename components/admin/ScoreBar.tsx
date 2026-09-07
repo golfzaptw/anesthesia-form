@@ -31,7 +31,7 @@ export function ScoreBar({
   const isAlert = count > 0 && average < alertThreshold;
 
   return (
-    <div className="py-3 border-b border-gray-100 last:border-0">
+    <div className="py-3 border-b border-gray-100 last:border-0 print:py-6 print:border-none print:break-inside-avoid">
       <div className="flex items-start justify-between gap-4 mb-1.5">
         <div className="flex-1">
           <div className="flex items-center gap-2">
@@ -64,8 +64,8 @@ export function ScoreBar({
 
       <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
         <div
-          className={`h-full rounded-full transition-all ${barColor(average)}`}
-          style={{ width: `${pct}%` }}
+          className={`h-full rounded-full transition-all ${barColor(average)} print:!border print:!border-gray-300`}
+          style={{ width: `${pct}%`, WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}
         />
       </div>
 
@@ -88,25 +88,23 @@ export function ScoreBar({
             </button>
           </div>
           
-          {showChart && (
-            <div className="mt-3 p-3 bg-gray-50 border border-gray-200 rounded-xl animate-in fade-in slide-in-from-top-2">
-              <h4 className="text-xs font-bold text-gray-600 mb-2">การกระจายตัวของคะแนน</h4>
-              <ScoreDistributionChart distribution={distribution} totalCount={count} />
-              
-              {comments && comments.length > 0 && (
-                <div className="mt-4 pt-3 border-t border-gray-200">
-                  <h4 className="text-xs font-bold text-gray-600 mb-2">ข้อเสนอแนะ:</h4>
-                  <ul className="list-disc pl-4 space-y-1.5">
-                    {comments.map((c, i) => (
-                      <li key={i} className="text-xs text-gray-700 whitespace-pre-wrap">
-                        {c.text}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </div>
-          )}
+          <div className={`mt-3 p-3 bg-gray-50 border border-gray-200 rounded-xl break-inside-avoid ${showChart ? 'block animate-in fade-in slide-in-from-top-2' : 'hidden print:block'}`}>
+            <h4 className="text-xs font-bold text-gray-600 mb-2">การกระจายตัวของคะแนน</h4>
+            <ScoreDistributionChart distribution={distribution} totalCount={count} />
+            
+            {comments && comments.length > 0 && (
+              <div className="mt-4 pt-3 border-t border-gray-200">
+                <h4 className="text-xs font-bold text-gray-800 mb-2">ข้อเสนอแนะ:</h4>
+                <ul className="list-disc pl-4 space-y-1.5">
+                  {comments.map((c, i) => (
+                    <li key={i} className="text-xs text-gray-700 whitespace-pre-wrap">
+                      {c.text}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>
