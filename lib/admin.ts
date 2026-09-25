@@ -1,4 +1,4 @@
-const ADMIN_EMAILS = (process.env.PUBLIC_ADMIN_EMAILS ?? "")
+const ADMIN_EMAILS = (process.env.NEXT_PUBLIC_ADMIN_EMAILS ?? "")
   .split(",")
   .map((e) => e.trim().toLowerCase())
   .filter(Boolean);
